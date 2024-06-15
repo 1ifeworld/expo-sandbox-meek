@@ -62,7 +62,8 @@ async function getPreDeployAccountAddress(): Promise<Hex> {
   return data as Hex;
 }
 
-// account to sign for should be undeployed smart account address
+// NOTE for meek. the passkey version of this function should be called:
+// prepare6492AccountSigUsingPasskeySigner
 async function prepare6492AccountSigUsingEoa712Signer(): Promise<Hash> {
   const eoa712Signature: Hex = await eoaAccount.signTypedData({
     account: eoaAccount.address,
