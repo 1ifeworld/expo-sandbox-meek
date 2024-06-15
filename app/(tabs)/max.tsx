@@ -104,7 +104,7 @@ export default function HomeScreen() {
     wasSigValid: boolean;
   };
 
-  const [eoaSigFor6492AccountResults, setEoaSigFor6492AccountResults] =
+  const [resultsFrom6492AccountSigUsingEoa712Signer, setResultsFrom6492AccountSigUsingEoa712Signer] =
     useState<Results>();
   if (!process.env.EXPO_PUBLIC_PRIVATE_KEY)
     throw Error("Private key not set in .env");
@@ -131,7 +131,7 @@ export default function HomeScreen() {
       wasSigValid: was6492SigValid,
     };
 
-    setEoaSigFor6492AccountResults(resultStruct);
+    setResultsFrom6492AccountSigUsingEoa712Signer(resultStruct);
   }
 
   return (
