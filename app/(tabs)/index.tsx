@@ -22,20 +22,10 @@ export default function HomeScreen() {
   if (!process.env.EXPO_PUBLIC_PRIVATE_KEY) throw Error("Private key not set in .env");
   const account = privateKeyToAccount(`0x${process.env.EXPO_PUBLIC_PRIVATE_KEY}`);
 
-  const signMessage = async () => {
+  const signAndVerifyTypedData = async () => {
     const sig = await account.signTypedData({
       domain,
-      types: {
-        Person: [
-          { name: "name", type: "string" },
-          { name: "wallet", type: "address" },
-        ],
-        Mail: [
-          { name: "from", type: "Person" },
-          { name: "to", type: "Person" },
-          { name: "contents", type: "string" },
-        ],
-      },
+      types: types,
       primaryType: "Mail",
       message: {
         from: {
@@ -54,23 +44,8 @@ export default function HomeScreen() {
     console.log(sig);
     const valid = await publicClient.verifyTypedData({
       address: "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266",
-      domain: {
-        name: "Ether Mail",
-        version: "1",
-        chainId: 1,
-        verifyingContract: "0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC",
-      },
-      types: {
-        Person: [
-          { name: "name", type: "string" },
-          { name: "wallet", type: "address" },
-        ],
-        Mail: [
-          { name: "from", type: "Person" },
-          { name: "to", type: "Person" },
-          { name: "contents", type: "string" },
-        ],
-      },
+      domain: domain,
+      types: types,
       primaryType: "Mail",
       message: {
         from: {
@@ -87,18 +62,12 @@ export default function HomeScreen() {
     });
     // @ts-ignore
     SetIsValidSignature(valid);
-    return String(sig);
   };
 
-  const results = {
-    address: "0x0001",
-    message: "Hello, 👋🏾",
-  };
-  // signMessage();
   return (
     <View margin={10} style={{ display: "flex", textAlign: "center", justifyContent: "center", alignItems: "center", height: "100%" }}>
       <View style={{ display: "flex", gap: "16px" }}>
-        <Button onClick={() => signMessage()} theme='active'>
+        <Button onClick={() => signAndVerifyTypedData()} theme='active'>
           Sign Message with EOA
         </Button>
         <Text>Account: {String(account.address)}</Text>
