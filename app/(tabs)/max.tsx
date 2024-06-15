@@ -108,7 +108,9 @@ export default function HomeScreen() {
   if (!process.env.EXPO_PUBLIC_PRIVATE_KEY)
     throw Error("Private key not set in .env");
 
-  async function signAndValidateEoa712SigFor6492Account() {
+  // NOTE for meek: the passkey version of this function should be called
+  // signAndValidate6492AccountSigUsingPasskeySigner
+  async function signAndValidate6492AccountSigUsingEoa712Signer() {
     const preDeployAccountAddress = await getPreDeployAccountAddress();
     const sigFor6492Account = await prepareEoa712SigFor6492Account();
     const was6492SigValid = await publicClient.verifyTypedData({
@@ -144,7 +146,7 @@ export default function HomeScreen() {
     >
       <View style={{ display: "flex", gap: "16px" }}>
         <Button
-          onClick={() => signAndValidateEoa712SigFor6492Account()}
+          onClick={() => signAndValidate6492AccountSigUsingEoa712Signer()}
           theme="active"
         >
           Sign Message with EOA For 6492 Account
