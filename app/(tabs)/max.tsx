@@ -62,12 +62,11 @@ async function getPreDeployAccountAddress(): Promise<Hex> {
   return data as Hex;
 }
 
-// account to sign for should be undeployed smart account address
-async function prepareEoa712SigFor6492Account(
-  accountToSignFor: Address
-): Promise<Hash> {
+// NOTE for meek. the passkey version of this function should be called:
+// prepare6492AccountSigUsingPasskeySigner
+async function prepare6492AccountSigUsingEoa712Signer(): Promise<Hash> {
   const eoa712Signature: Hex = await eoaAccount.signTypedData({
-    account: accountToSignFor,
+    account: eoaAccount.address,
     domain: domain,
     types: types,
     primaryType: "Mail",
@@ -105,34 +104,36 @@ export default function HomeScreen() {
     wasSigValid: boolean;
   };
 
-  const [eoaSigFor6492AccountResults, setEoaSigFor6492AccountResults] =
-    useState<Results>();
+  const [
+    resultsFrom6492AccountSigUsingEoa712Signer,
+    setResultsFrom6492AccountSigUsingEoa712Signer,
+  ] = useState<Results>();
   if (!process.env.EXPO_PUBLIC_PRIVATE_KEY)
     throw Error("Private key not set in .env");
 
-  async function signAndValidateEoa712SigFor6492Account() {
+  // NOTE for meek: the passkey version of this function should be called
+  // signAndValidate6492AccountSigUsingPasskeySigner
+  async function signAndValidate6492AccountSigUsingEoa712Signer() {
     const preDeployAccountAddress = await getPreDeployAccountAddress();
-    const eoa712SigFor6492Account = await prepareEoa712SigFor6492Account(
-      preDeployAccountAddress
-    );
+    const sigFor6492Account = await prepare6492AccountSigUsingEoa712Signer();
     const was6492SigValid = await publicClient.verifyTypedData({
       address: preDeployAccountAddress,
       domain: domain,
       types: types,
       primaryType: "Mail",
       message: message,
-      signature: eoa712SigFor6492Account,
+      signature: sigFor6492Account,
     });
 
     const resultStruct = {
       eoaSigner: eoaAccount.address,
       preDeployAccount: preDeployAccountAddress,
       message: message,
-      signature: eoa712SigFor6492Account,
+      signature: sigFor6492Account,
       wasSigValid: was6492SigValid,
     };
 
-    setEoaSigFor6492AccountResults(resultStruct);
+    setResultsFrom6492AccountSigUsingEoa712Signer(resultStruct);
   }
 
   return (
@@ -148,16 +149,34 @@ export default function HomeScreen() {
     >
       <View style={{ display: "flex", gap: "16px" }}>
         <Button
-          onClick={() => signAndValidateEoa712SigFor6492Account()}
+          // @ts-ignore
+          onClick={() => signAndValidate6492AccountSigUsingEoa712Signer()}
           theme="active"
         >
           Sign Message with EOA For 6492 Account
         </Button>
-        <Text>Eoa Signer: {eoaSigFor6492AccountResults?.eoaSigner}</Text>
-        <Text>6492 Account: {eoaSigFor6492AccountResults?.preDeployAccount}</Text>
-        <Text>Message: {JSON.stringify(eoaSigFor6492AccountResults?.message, null, 2)}</Text>
-        <Text>Signature: {eoaSigFor6492AccountResults?.signature}</Text>
-        <Text>Sig Validity: {eoaSigFor6492AccountResults?.wasSigValid}</Text>
+        <Text>
+          Eoa Signer: {resultsFrom6492AccountSigUsingEoa712Signer?.eoaSigner}
+        </Text>
+        <Text>
+          6492 Account:{" "}
+          {resultsFrom6492AccountSigUsingEoa712Signer?.preDeployAccount}
+        </Text>
+        <Text>
+          Message:{" "}
+          {JSON.stringify(
+            resultsFrom6492AccountSigUsingEoa712Signer?.message,
+            null,
+            2
+          )}
+        </Text>
+        <Text>
+          Signature: {resultsFrom6492AccountSigUsingEoa712Signer?.signature}
+        </Text>
+        <Text>
+          Sig Validity:{" "}
+          {resultsFrom6492AccountSigUsingEoa712Signer?.wasSigValid}
+        </Text>
 
         {/* <Button theme="active">Sign Message with Passkey</Button> */}
       </View>
