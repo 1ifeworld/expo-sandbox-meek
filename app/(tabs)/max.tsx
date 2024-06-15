@@ -63,11 +63,9 @@ async function getPreDeployAccountAddress(): Promise<Hex> {
 }
 
 // account to sign for should be undeployed smart account address
-async function prepareEoa712SigFor6492Account(
-  accountToSignFor: Address
-): Promise<Hash> {
+async function prepareEoa712SigFor6492Account(): Promise<Hash> {
   const eoa712Signature: Hex = await eoaAccount.signTypedData({
-    account: accountToSignFor,
+    account: eoaAccount.address,
     domain: domain,
     types: types,
     primaryType: "Mail",
@@ -112,23 +110,21 @@ export default function HomeScreen() {
 
   async function signAndValidateEoa712SigFor6492Account() {
     const preDeployAccountAddress = await getPreDeployAccountAddress();
-    const eoa712SigFor6492Account = await prepareEoa712SigFor6492Account(
-      preDeployAccountAddress
-    );
+    const sigFor6492Account = await prepareEoa712SigFor6492Account();
     const was6492SigValid = await publicClient.verifyTypedData({
       address: preDeployAccountAddress,
       domain: domain,
       types: types,
       primaryType: "Mail",
       message: message,
-      signature: eoa712SigFor6492Account,
+      signature: sigFor6492Account,
     });
 
     const resultStruct = {
       eoaSigner: eoaAccount.address,
       preDeployAccount: preDeployAccountAddress,
       message: message,
-      signature: eoa712SigFor6492Account,
+      signature: sigFor6492Account,
       wasSigValid: was6492SigValid,
     };
 
