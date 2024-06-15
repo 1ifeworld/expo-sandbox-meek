@@ -104,8 +104,10 @@ export default function HomeScreen() {
     wasSigValid: boolean;
   };
 
-  const [resultsFrom6492AccountSigUsingEoa712Signer, setResultsFrom6492AccountSigUsingEoa712Signer] =
-    useState<Results>();
+  const [
+    resultsFrom6492AccountSigUsingEoa712Signer,
+    setResultsFrom6492AccountSigUsingEoa712Signer,
+  ] = useState<Results>();
   if (!process.env.EXPO_PUBLIC_PRIVATE_KEY)
     throw Error("Private key not set in .env");
 
@@ -147,16 +149,34 @@ export default function HomeScreen() {
     >
       <View style={{ display: "flex", gap: "16px" }}>
         <Button
+          // @ts-ignore
           onClick={() => signAndValidate6492AccountSigUsingEoa712Signer()}
           theme="active"
         >
           Sign Message with EOA For 6492 Account
         </Button>
-        <Text>Eoa Signer: {eoaSigFor6492AccountResults?.eoaSigner}</Text>
-        <Text>6492 Account: {eoaSigFor6492AccountResults?.preDeployAccount}</Text>
-        <Text>Message: {JSON.stringify(eoaSigFor6492AccountResults?.message, null, 2)}</Text>
-        <Text>Signature: {eoaSigFor6492AccountResults?.signature}</Text>
-        <Text>Sig Validity: {eoaSigFor6492AccountResults?.wasSigValid}</Text>
+        <Text>
+          Eoa Signer: {resultsFrom6492AccountSigUsingEoa712Signer?.eoaSigner}
+        </Text>
+        <Text>
+          6492 Account:{" "}
+          {resultsFrom6492AccountSigUsingEoa712Signer?.preDeployAccount}
+        </Text>
+        <Text>
+          Message:{" "}
+          {JSON.stringify(
+            resultsFrom6492AccountSigUsingEoa712Signer?.message,
+            null,
+            2
+          )}
+        </Text>
+        <Text>
+          Signature: {resultsFrom6492AccountSigUsingEoa712Signer?.signature}
+        </Text>
+        <Text>
+          Sig Validity:{" "}
+          {resultsFrom6492AccountSigUsingEoa712Signer?.wasSigValid}
+        </Text>
 
         {/* <Button theme="active">Sign Message with Passkey</Button> */}
       </View>
