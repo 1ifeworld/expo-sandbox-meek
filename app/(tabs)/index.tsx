@@ -65,7 +65,7 @@ export default function HomeScreen() {
     <View margin={10} style={{ display: "flex", textAlign: "center", justifyContent: "center", alignItems: "center", height: "100%" }}>
       <View style={{ display: "flex", gap: "16px" }}>
         <Button
-          onClick={() => {
+          onPress={() => {
             getDeterministicAddress();
             signAndVerifyTypedDataEOA();
           }}
@@ -78,7 +78,7 @@ export default function HomeScreen() {
         <Text>isValidSignature: {String(isValidSignature)}</Text>
         <Text>Deterministic Address: {getAddress}</Text>
 
-        <Button theme='active'>Sign Message with Passkey</Button>
+        {/* <Button theme='active'>Sign Message with Passkey</Button> */}
       </View>
     </View>
   );
