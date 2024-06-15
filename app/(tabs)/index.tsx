@@ -57,14 +57,19 @@ export default function HomeScreen() {
   const signAndVerifyTypedData6492 = async () => {};
 
   useEffect(() => {
-    getDeterministicAddress();
-    signAndVerifyTypedDataEOA();
+    // getDeterministicAddress();
+    // signAndVerifyTypedDataEOA();
   }, [signature, getAddress, isValidSignature]);
 
   return (
     <View margin={10} style={{ display: "flex", textAlign: "center", justifyContent: "center", alignItems: "center", height: "100%" }}>
       <View style={{ display: "flex", gap: "16px" }}>
-        <Button onClick={() => signAndVerifyTypedDataEOA()} theme='active'>
+        <Button
+          onClick={() => {
+            getDeterministicAddress();
+            signAndVerifyTypedDataEOA();
+          }}
+          theme='active'>
           Sign Message with EOA
         </Button>
         <Text>Account: {String(account.address)}</Text>
