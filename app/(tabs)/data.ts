@@ -1,9 +1,13 @@
+export const FACTORY_ADDRESS = "0xabc14A381ab1BC4750eb08D11E5e29506e68c1b9";
+export const MOCK_VERIFIER_ADDRESS = "0x76379783717d3aBA4da7A712C5996cB9Fe468F03";
+export const IMPLEMENTATION_ADDRESS = "0x66Fc5534b1A5521dCA263DCDF44a315eFDAa33C2";
+
 // All properties on a domain are optional
 export const domain = {
   name: "Ether Mail",
   version: "1",
   chainId: 1,
-  verifyingContract: "0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC",
+  verifyingContract: MOCK_VERIFIER_ADDRESS,
 } as const;
 
 // The named list of all type definitions
@@ -30,7 +34,3 @@ export const message = {
   },
   contents: "Hello, Bob!",
 };
-
-export const FACTORY_ADDRESS = "0xabc14A381ab1BC4750eb08D11E5e29506e68c1b9";
-export const MOCK_VERIFIER_ADDRESS = "0x76379783717d3aBA4da7A712C5996cB9Fe468F03";
-export const IMPLEMENTATION_ADDRESS = "0x66Fc5534b1A5521dCA263DCDF44a315eFDAa33C2";

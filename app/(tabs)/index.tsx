@@ -41,13 +41,6 @@ export default function HomeScreen() {
     });
     // @ts-ignore
     setIsValidSignature(valid);
-
-    const data = await publicClient.readContract({
-      address: FACTORY_ADDRESS,
-      abi: CoinbaseSmartWalletFactoryAbi,
-      functionName: "getAddress",
-      args: [["0x000000000000000000000000a5cc3c03994db5b0d9a5eedd10cabab0813678ac"], 0],
-    });
   };
 
   const getDeterministicAddress = async () => {
@@ -61,16 +54,7 @@ export default function HomeScreen() {
     setGetAddress(data);
   };
 
-  const signAndVerifyTypedData6492 = async () => {
-    const data = await publicClient.readContract({
-      address: FACTORY_ADDRESS,
-      abi: CoinbaseSmartWalletFactoryAbi,
-      functionName: "getAddress",
-      args: [["0x000000000000000000000000a5cc3c03994db5b0d9a5eedd10cabab0813678ac"], 0],
-    });
-    // @ts-ignore
-    setGetAddress(data);
-  };
+  const signAndVerifyTypedData6492 = async () => {};
 
   useEffect(() => {
     getDeterministicAddress();
