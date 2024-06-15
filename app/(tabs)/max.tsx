@@ -148,11 +148,7 @@ export default function HomeScreen() {
       }}
     >
       <View style={{ display: "flex", gap: "16px" }}>
-        <Button
-          // @ts-ignore
-          onClick={() => signAndValidate6492AccountSigUsingEoa712Signer()}
-          theme="active"
-        >
+        <Button onPress={() => signAndValidate6492AccountSigUsingEoa712Signer()} theme='active'>
           Sign Message with EOA For 6492 Account
         </Button>
         <Text>
