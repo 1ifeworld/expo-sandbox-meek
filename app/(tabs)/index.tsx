@@ -22,11 +22,11 @@ export default function HomeScreen() {
 
   const signAndVerifyTypedDataEOA = async () => {
     const sig = await account.signTypedData({
-      domain,
-      types,
+      domain: domain,
+      types: types,
       primaryType: "Mail",
       // @ts-ignore
-      message,
+      message: message,
     });
     // @ts-ignore
     setSignature(sig);
@@ -68,6 +68,7 @@ export default function HomeScreen() {
           Sign Message with EOA
         </Button>
         <Text>Account: {String(account.address)}</Text>
+        <Text>message: {JSON.stringify(message, null, 2)}</Text>
         <Text>Sig: {String(signature)}</Text>
         <Text>isValidSignature: {String(isValidSignature)}</Text>
         <Text>Deterministic Address: {getAddress}</Text>
