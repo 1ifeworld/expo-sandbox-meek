@@ -197,11 +197,8 @@ export default function HomeScreen() {
       }}
     >
       <View style={{ display: "flex", gap: "16px" }}>
-        <Button
-          onPress={() => signAndValidate6492AccountSiweSigUsingEoaSigner()}
-          theme="active"
-        >
-          Sign Message with EOA For 6492 Account
+        <Button onClick={() => signAndVerifyTypedDataEOA()} theme='active'>
+          Sign Message with EOA
         </Button>
         <Text>
           Eoa Signer: {resultsFrom6492AccountSiweSigUsingEoaSigner?.eoaSigner}
@@ -233,7 +230,7 @@ export default function HomeScreen() {
           {resultsFrom6492AccountSiweSigUsingEoaSigner?.wasSigValid}
         </Text>
 
-        {/* <Button theme="active">Sign Message with Passkey</Button> */}
+        <Button theme='active'>Sign Message with Passkey</Button>
       </View>
     </View>
   );

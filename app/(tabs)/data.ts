@@ -27,11 +27,11 @@ export const types = {
 export const message = {
   from: {
     name: "Cow",
-    wallet: "0xCD2a3d9F938E13CD947Ec05AbC7FE734Df8DD826",
+    wallet: "0x10FaD54eddB7123fd082CB5EDe393f2481Ff625B",
   },
   to: {
     name: "Bob",
-    wallet: "0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB",
+    wallet: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
   },
   contents: "Hello, Bob!",
 };
