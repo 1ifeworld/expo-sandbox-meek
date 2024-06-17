@@ -75,7 +75,7 @@ async function getSafeHash({
     factoryData: encodeFunctionData({
       abi: parseAbi(["function createAccount(bytes[] owners, uint256 nonce)"]),
       functionName: "createAccount",
-      args: [ownersForPreDeployAcct, 0n],
+      args: [ownersForPreDeployAcct, BigInt(0)],
     }),
     // Function to call on the Smart Account.
     abi: CoinbaseSmartWallet,
@@ -197,7 +197,7 @@ export default function HomeScreen() {
       }}
     >
       <View style={{ display: "flex", gap: "16px" }}>
-        <Button onClick={() => signAndVerifyTypedDataEOA()} theme='active'>
+        <Button onPress={() => signAndValidate6492AccountSiweSigUsingEoaSigner()} theme='active'>
           Sign Message with EOA
         </Button>
         <Text>
