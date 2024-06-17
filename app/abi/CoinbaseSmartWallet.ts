@@ -1,3 +1,14 @@
+export const coinbaseSignatureWrapperAbi = [
+  {
+    components: [
+      { name: "ownerIndex", type: "uint256" },
+      { name: "signatureData", type: "bytes" },
+    ],
+    name: "SignatureWrapper",
+    type: "tuple",
+  },
+] as const;
+
 export const CoinbaseSmartWallet = [
   { type: "constructor", inputs: [], stateMutability: "nonpayable" },
   { type: "fallback", stateMutability: "payable" },
@@ -247,3 +258,4 @@ export const CoinbaseSmartWallet = [
     ],
   },
 ] as const;
+
