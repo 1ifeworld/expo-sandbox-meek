@@ -4,26 +4,22 @@ import { Platform } from "react-native";
 import * as Application from "expo-application";
 import * as LocalAuthentication from "expo-local-authentication";
 
+const publicKey = {
+  challenge: new TextEncoder().encode("fizz"),
+  rp: {
+    id: undefined,
+    name: "expo-sandbox-meek",
+  },
+  user: {
+    id: new Uint8Array([79, 252, 83, 72, 214, 7, 89, 26]),
+    name: "ioey",
+    displayName: "joey Doe",
+  },
+  pubKeyCredParams: [{ type: "public-key", alg: -7 }],
+} satisfies PublicKeyCredentialCreationOptions;
+
 export default function PasskeyScreen() {
   const [passkeyCedential, setPasskeyCredential] = React.useState<Credential | null>();
-
-  function utf8StringToBuffer(value: string): ArrayBuffer {
-    return new TextEncoder().encode(value);
-  }
-
-  const publicKey = {
-    challenge: utf8StringToBuffer("fizz"),
-    rp: {
-      id: undefined,
-      name: "expo-sandbox-meek",
-    },
-    user: {
-      id: new Uint8Array([79, 252, 83, 72, 214, 7, 89, 26]),
-      name: "ioey",
-      displayName: "joey Doe",
-    },
-    pubKeyCredParams: [{ type: "public-key", alg: -7 }],
-  } satisfies PublicKeyCredentialCreationOptions;
 
   const createPasskey = async () => {
     switch (Platform.OS) {
