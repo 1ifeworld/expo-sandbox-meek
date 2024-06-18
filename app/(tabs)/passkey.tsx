@@ -26,9 +26,6 @@ export default function PasskeyScreen() {
       displayName: "joey Doe",
     },
     pubKeyCredParams: [{ type: "public-key", alg: -7 }],
-    authenticatorSelection: {
-      userVerification: "preferred",
-    },
   } satisfies PublicKeyCredentialCreationOptions;
 
   const createPasskey = async () => {
@@ -83,7 +80,7 @@ export default function PasskeyScreen() {
         </Button>
         {passkeyCedential && (
           <>
-            <Text>Passkey Signer: {JSON.stringify(passkeyCedential?.type)}</Text>
+            <Text>Passkey Signer: {}</Text>
             <Text>6492 Account: {}</Text>
             <Text>Message: {}</Text>
             <Text>Signature: {}</Text>
