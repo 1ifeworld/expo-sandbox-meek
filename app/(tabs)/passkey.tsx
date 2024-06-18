@@ -14,10 +14,7 @@ export default function PasskeyScreen() {
   const publicKey = {
     challenge: utf8StringToBuffer("fizz"),
     rp: {
-      id: Platform.select({
-        web: undefined,
-        native: `${Application.applicationId?.split(".").reverse().join(".")}`,
-      }),
+      id: undefined,
       name: "expo-sandbox-meek",
     },
     user: {
@@ -35,8 +32,12 @@ export default function PasskeyScreen() {
         console.log(LocalAuthentication);
       }
       case "web": {
-        const publicKeyCredential = await navigator.credentials.create({ publicKey });
-        console.log("✅ Created New Passkeys", publicKeyCredential);
+        try {
+          const publicKeyCredential = await navigator.credentials.create({ publicKey });
+          console.log("✅ Created New Passkeys", publicKeyCredential);
+        } catch (e) {
+          console.error(e);
+        }
       }
       default: {
         // throw new Error("Unsupported platform");
@@ -51,9 +52,13 @@ export default function PasskeyScreen() {
         console.log(LocalAuthentication);
       }
       case "web": {
-        const publicKeyCredential = await navigator.credentials.get({ publicKey });
-        setPasskeyCredential(publicKeyCredential);
-        console.log("✅ Get Passkey", publicKeyCredential);
+        try {
+          const publicKeyCredential = await navigator.credentials.get({ publicKey });
+          setPasskeyCredential(publicKeyCredential);
+          console.log("✅ Get Passkey", publicKeyCredential);
+        } catch (e) {
+          console.error(e);
+        }
       }
       default: {
         // throw new Error("Unsupported platform");
