@@ -19,7 +19,7 @@ export const usePasskey = () => {
       name: "ioey",
       displayName: "joey Doe",
     },
-    pubKeyCredParams: [{ type: "public-key", alg: -7 }],
+    pubKeyCredParams: [{ type: "public-key", alg: -7 }]
   } satisfies PublicKeyCredentialCreationOptions;
 
   const createPasskey = async () => {
@@ -80,12 +80,12 @@ export const usePasskey = () => {
             let signature = parseSignature(new Uint8Array(credential?.response?.signature));
             return {
               rawId: toHex(new Uint8Array(credential.rawId)),
-              clientData: {
+              clientData: JSON.stringify({
                 type: clientDataObj.type,
                 challenge: clientDataObj.challenge,
                 origin: clientDataObj.origin,
                 crossOrigin: clientDataObj.crossOrigin,
-              },
+              }),
               authenticatorData,
               signature,
             };

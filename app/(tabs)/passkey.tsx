@@ -1,12 +1,80 @@
 import React from "react";
 import { View, Button, Text } from "tamagui";
 import { usePasskey } from "../../hooks/usePasskey";
-import { toHex, Hex, createPublicClient, http, encodeAbiParameters } from "viem";
+import {
+  toHex,
+  Hex,
+  createPublicClient,
+  http,
+  encodeAbiParameters,
+  hexToBigInt,
+  Address,
+  hashMessage,
+  Hash,
+  encodeFunctionData,
+  parseAbi,
+  concat,
+} from "viem";
 import { optimismSepolia } from "viem/chains";
 import { decode } from "cbor-x";
 import { Buffer } from "buffer";
 import { CoinbaseSmartWalletFactoryAbi } from "../abi/CoinbaseSmartWalletFactory";
 import { FACTORY_ADDRESS, ERC6492_DETECTION_SUFFIX } from "./data";
+import { createSiweMessage, generateSiweNonce } from "viem/siwe";
+import {
+  CoinbaseSmartWallet,
+  coinbaseSignatureWrapperAbi,
+} from "../abi/CoinbaseSmartWallet";
+
+const webauthnStructAbi = [
+  {
+    components: [
+      { name: "authenticatorData", type: "bytes" },
+      { name: "clientDataJson", type: "string" },
+      { name: "challengeIndex", type: "uint256" },
+      { name: "typeIndex", type: "uint256" },
+      { name: "r", type: "uint256" },
+      { name: "s", type: "uint2556" },
+    ],
+    name: "WebAuthnAuth",
+    type: "tuple",
+  },
+] as const;
+
+function getCreateAccountInitData(accountOwners: Hash[]) {
+  return encodeFunctionData({
+    abi: CoinbaseSmartWalletFactoryAbi,
+    functionName: "createAccount",
+    args: [accountOwners, 0],
+  });
+}
+
+async function getSafeHash({
+  ownersForPreDeployAcct,
+  preDeployAcct,
+  startingHash,
+}: {
+  ownersForPreDeployAcct: Hash[];
+  preDeployAcct: Address;
+  startingHash: Hash;
+}): Promise<Hash> {
+  const data = await publicClient.readContract({
+    // Address of the Smart Account deployer (factory).
+    factory: FACTORY_ADDRESS,
+    // Function to execute on the factory to deploy the Smart Account.
+    factoryData: encodeFunctionData({
+      abi: parseAbi(["function createAccount(bytes[] owners, uint256 nonce)"]),
+      functionName: "createAccount",
+      args: [ownersForPreDeployAcct, BigInt(0)],
+    }),
+    // Function to call on the Smart Account.
+    abi: CoinbaseSmartWallet,
+    address: preDeployAcct,
+    functionName: "replaySafeHash",
+    args: [startingHash],
+  });
+  return data;
+}
 
 const publicClient = createPublicClient({
   chain: optimismSepolia,
@@ -68,18 +136,87 @@ export default function PasskeyScreen() {
     const y = toHex(publicKey[-3]);
 
     const encodedOwner = encodeAbiParameters(
-      [{name: "x", type: "bytes"}, {name: "y", type: "bytes"}],
+      [
+        { name: "x", type: "bytes" },
+        { name: "y", type: "bytes" },
+      ],
       [x, y]
-    )
+    );
 
-    const undeplyedSmartAccountAddress = await publicClient.readContract({
+    const data = await publicClient.readContract({
       address: FACTORY_ADDRESS,
       abi: CoinbaseSmartWalletFactoryAbi,
-      functionName: 'getAddress',
-      args: [[encodedOwner], 0]
-    })    
+      functionName: "getAddress",
+      args: [[encodedOwner], 0],
+    });
+    const undeplyedSmartAccountAddress = data as Address;
 
-    console.log("undeplyedSmartAccountAddress:", undeplyedSmartAccountAddress)
+    console.log("undeplyedSmartAccountAddress:", undeplyedSmartAccountAddress);
+
+    // how to generate a p256 signature we can then create a SIWE message with
+    const unhashedSiweMessage = createSiweMessage({
+      address: undeplyedSmartAccountAddress as Address,
+      chainId: optimismSepolia.id,
+      domain: "example.com",
+      nonce: generateSiweNonce(),
+      uri: "https://example.com/path",
+      version: "1",
+    });
+    const hashedSiweMessage = hashMessage(unhashedSiweMessage);
+    // const replaySafeHash = await getSafeHash({
+    //   ownersForPreDeployAcct: [encodedOwner],
+    //   preDeployAcct: undeplyedSmartAccountAddress,
+    //   startingHash: hashedSiweMessage,
+    // });
+    const dummyChallenge = "0x"
+    const signatureRequest = await signWithPasskey(dummyChallenge);
+    console.log("signatureRequest: ", signatureRequest);
+    if (!signatureRequest) return;
+
+    const encodedWebAuthnStruct = encodeAbiParameters(webauthnStructAbi, [
+      {
+        authenticatorData: signatureRequest.authenticatorData,
+        clientDataJson: signatureRequest.clientData,
+        challengeIndex: BigInt(1),
+        typeIndex: BigInt(0),
+        r: hexToBigInt(signatureRequest.signature.r),
+        s: hexToBigInt(signatureRequest.signature.s),
+      },
+    ]);
+
+    console.log("encoded webautn struct", encodedWebAuthnStruct)
+
+    const encodedSignatureWrapper: Hash = encodeAbiParameters(
+      coinbaseSignatureWrapperAbi,
+      [{ ownerIndex: BigInt(0), signatureData: encodedWebAuthnStruct }]
+    );
+
+    console.log("encodedSignatureWrapper", encodedSignatureWrapper)
+
+    // generate account init data
+    const createAccountInitData = getCreateAccountInitData([
+      undeplyedSmartAccountAddress,
+    ]);
+
+    // const sigFor6492Account: Hash = concat([
+    //   encodeAbiParameters(
+    //     [
+    //       { name: "smartAccountFactory", type: "address" },
+    //       { name: "createAccountInitData", type: "bytes" },
+    //       { name: "encodedSigWrapper", type: "bytes" },
+    //     ],
+    //     [FACTORY_ADDRESS, createAccountInitData, encodedSignatureWrapper]
+    //   ),
+    //   ERC6492_DETECTION_SUFFIX,
+    // ]);
+
+    // const was6492SiweSigValid = await publicClient.verifySiweMessage({
+    //   address: undeplyedSmartAccountAddress,
+    //   message: unhashedSiweMessage,
+    //   signature: sigFor6492Account,
+    // });
+
+    // console.log("was6492SiweSigValid", was6492SiweSigValid)
   };
 
   function prepare6492SiweSigWithPasskeyigner() {}
