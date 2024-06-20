@@ -4,6 +4,7 @@ import { Platform } from "react-native";
 import { Hex, toHex } from "viem";
 import { P256Credential } from "./types";
 import { parseSignature } from "./helpers";
+import { Buffer } from "buffer";
 
 export const usePasskey = () => {
   const publicKey = {
@@ -41,10 +42,10 @@ export const usePasskey = () => {
     }
   };
 
-  /*
-   ** @challenge Hex message to be signed with passkey publickey
-   ** @return P256Signature
-   **/
+  /**
+   * @param challenge Hex message to be signed with passkey publickey
+   * @return P256Signature
+   */
   const signWithPasskey = async (challenge: Hex): Promise<P256Credential | undefined> => {
     switch (Platform.OS) {
       case "ios": {
