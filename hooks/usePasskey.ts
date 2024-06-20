@@ -4,7 +4,8 @@ import { Platform } from "react-native";
 import { Hex, toHex } from "viem";
 import { P256Credential } from "./types";
 import { parseSignature } from "./helpers";
-import { Buffer } from "buffer";
+import { Buffer } from "buffer"
+
 
 export const usePasskey = () => {
   const publicKey = {
@@ -31,6 +32,7 @@ export const usePasskey = () => {
           try {
             // Creates a passkey that is stored locally on your device ie. iCloud
             const credential = (await navigator.credentials.create({ publicKey })) as PublicKeyCredentialCreateResponse;
+            return credential 
           } catch (e) {
             console.error(e);
           }
