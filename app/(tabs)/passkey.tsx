@@ -43,7 +43,7 @@ const webauthnStructAbi = [
 
 function getCreateAccountInitData(accountOwners: Hash[]) {
   return encodeFunctionData({
-    abi: CoinbaseSmartWalletFactoryAbi,
+    abi: parseAbi(["function createAccount(bytes[] owners, uint256 nonce)"]),
     functionName: "createAccount",
     args: [accountOwners, 0],
   });
@@ -63,9 +63,9 @@ async function getSafeHash({
     factory: FACTORY_ADDRESS,
     // Function to execute on the factory to deploy the Smart Account.
     factoryData: encodeFunctionData({
-      abi: parseAbi(["function createAccount(bytes[] owners, uint256 nonce)"]),
+      abi: CoinbaseSmartWalletFactoryAbi,
       functionName: "createAccount",
-      args: [ownersForPreDeployAcct, BigInt(0)],
+      args: [ownersForPreDeployAcct, 0],
     }),
     // Function to call on the Smart Account.
     abi: CoinbaseSmartWallet,
@@ -135,41 +135,40 @@ export default function PasskeyScreen() {
     const x = toHex(publicKey[-2]);
     const y = toHex(publicKey[-3]);
 
-    const encodedOwner = encodeAbiParameters(
-      [
-        { name: "x", type: "bytes" },
-        { name: "y", type: "bytes" },
-      ],
-      [x, y]
-    );
+    const encodedOwner = `0x${x.slice(2)}${y.slice(2)}` as Hex;
+
+    console.log("encodedOwner", encodedOwner);
 
     const data = await publicClient.readContract({
       address: FACTORY_ADDRESS,
       abi: CoinbaseSmartWalletFactoryAbi,
       functionName: "getAddress",
-      args: [[encodedOwner], 0],
+      args: [[encodedOwner], BigInt(0)],
     });
-    const undeplyedSmartAccountAddress = data as Address;
+    const undeployedSmartAccountAddress = data as Address;
 
-    console.log("undeplyedSmartAccountAddress:", undeplyedSmartAccountAddress);
+    console.log(
+      "undeployedSmartAccountAddress:",
+      undeployedSmartAccountAddress
+    );
 
     // how to generate a p256 signature we can then create a SIWE message with
     const unhashedSiweMessage = createSiweMessage({
-      address: undeplyedSmartAccountAddress as Address,
+      address: undeployedSmartAccountAddress as Address,
       chainId: optimismSepolia.id,
-      domain: "example.com",
+      domain: "localhost",
       nonce: generateSiweNonce(),
-      uri: "https://example.com/path",
+      uri: "localhost:8081",
       version: "1",
     });
     const hashedSiweMessage = hashMessage(unhashedSiweMessage);
-    // const replaySafeHash = await getSafeHash({
-    //   ownersForPreDeployAcct: [encodedOwner],
-    //   preDeployAcct: undeplyedSmartAccountAddress,
-    //   startingHash: hashedSiweMessage,
-    // });
-    const dummyChallenge = "0x"
-    const signatureRequest = await signWithPasskey(dummyChallenge);
+    const replaySafeHash = await getSafeHash({
+      ownersForPreDeployAcct: [encodedOwner],
+      preDeployAcct: undeployedSmartAccountAddress,
+      startingHash: hashedSiweMessage,
+    });
+    // const dummyChallenge = "0x";
+    const signatureRequest = await signWithPasskey(replaySafeHash);
     console.log("signatureRequest: ", signatureRequest);
     if (!signatureRequest) return;
 
@@ -184,39 +183,39 @@ export default function PasskeyScreen() {
       },
     ]);
 
-    console.log("encoded webautn struct", encodedWebAuthnStruct)
+    console.log("encoded webautn struct", encodedWebAuthnStruct);
 
     const encodedSignatureWrapper: Hash = encodeAbiParameters(
       coinbaseSignatureWrapperAbi,
       [{ ownerIndex: BigInt(0), signatureData: encodedWebAuthnStruct }]
     );
 
-    console.log("encodedSignatureWrapper", encodedSignatureWrapper)
+    console.log("encodedSignatureWrapper", encodedSignatureWrapper);
 
     // generate account init data
     const createAccountInitData = getCreateAccountInitData([
-      undeplyedSmartAccountAddress,
+      undeployedSmartAccountAddress,
     ]);
 
-    // const sigFor6492Account: Hash = concat([
-    //   encodeAbiParameters(
-    //     [
-    //       { name: "smartAccountFactory", type: "address" },
-    //       { name: "createAccountInitData", type: "bytes" },
-    //       { name: "encodedSigWrapper", type: "bytes" },
-    //     ],
-    //     [FACTORY_ADDRESS, createAccountInitData, encodedSignatureWrapper]
-    //   ),
-    //   ERC6492_DETECTION_SUFFIX,
-    // ]);
+    const sigFor6492Account: Hash = concat([
+      encodeAbiParameters(
+        [
+          { name: "smartAccountFactory", type: "address" },
+          { name: "createAccountInitData", type: "bytes" },
+          { name: "encodedSigWrapper", type: "bytes" },
+        ],
+        [FACTORY_ADDRESS, createAccountInitData, encodedSignatureWrapper]
+      ),
+      ERC6492_DETECTION_SUFFIX,
+    ]);
 
-    // const was6492SiweSigValid = await publicClient.verifySiweMessage({
-    //   address: undeplyedSmartAccountAddress,
-    //   message: unhashedSiweMessage,
-    //   signature: sigFor6492Account,
-    // });
+    const was6492SiweSigValid = await publicClient.verifySiweMessage({
+      address: undeployedSmartAccountAddress,
+      message: unhashedSiweMessage,
+      signature: sigFor6492Account,
+    });
 
-    // console.log("was6492SiweSigValid", was6492SiweSigValid)
+    console.log("was6492SiweSigValid", was6492SiweSigValid);
   };
 
   function prepare6492SiweSigWithPasskeyigner() {}
@@ -230,16 +229,14 @@ export default function PasskeyScreen() {
         justifyContent: "center",
         alignItems: "center",
         height: "100%",
-      }}
-    >
+      }}>
       <View style={{ display: "flex", gap: "16px" }}>
         <Button onPress={onPressHandler} theme="active">
           Create Passkey
         </Button>
         <Button
           onPress={() => signWithPasskey(toHex("signature"))}
-          theme="active"
-        >
+          theme="active">
           Sign with Passkey
         </Button>
         {passkeyCedential && (
