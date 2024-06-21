@@ -2,7 +2,7 @@ import React from "react";
 import { View, Button, Text } from "tamagui";
 import { decode } from "cbor-x";
 import { Buffer } from "buffer";
-import { Hex, toHex, Address, encodeAbiParameters, hexToBigInt, Hash, concat, createPublicClient, http } from "viem";
+import { Hex, toHex, Address, encodeAbiParameters, hexToBigInt, Hash, concat, createPublicClient, http, hexToString } from "viem";
 import { optimismSepolia, optimism } from "viem/chains";
 import * as asn1js from "asn1js";
 import { PublicKeyInfo } from "pkijs";
@@ -14,7 +14,6 @@ import {
   CoinbaseSmartWallet,
   coinbaseSignatureWrapperAbi,
 } from "../abi/CoinbaseSmartWallet";
-import { p256SolAbi } from "../abi/p256Sol";
 import { webauthnStructAbi, getCreateAccountInitData } from "../ethereum";
 import {secp256r1} from "@noble/curves/p256"
 import { sha256 } from '@noble/hashes/sha256'
@@ -71,6 +70,10 @@ async function handlePasskey() {
     },
   };
 
+  console.log("challenge to hex", toHex(new Uint8Array(getCredentialDefaultArgs.publicKey.challenge)))
+//   var yo = getCredentialDefaultArgs.publicKey.challenge.toString('base64')
+//   var yo = b
+
   // register / create a new credential
   // @ts-ignore
   var cred = await navigator.credentials.create(createCredentialDefaultArgs);
@@ -81,15 +84,27 @@ async function handlePasskey() {
   }
 
   var assertation = await navigator.credentials.get(getCredentialDefaultArgs);
-  // @ts-ignore
+  console.log("assertson to JSON: ", JSON.stringify(assertation))
+  // @ts-ignore/
   var signature = assertation.response.signature;
   console.log("SIGNATURE", signature);
   // @ts-ignore
   var clientDataJSON = assertation.response.clientDataJSON;
-  console.log("clientDataJSON", clientDataJSON);
+  const utf8Decoder = new TextDecoder("utf-8");
+  const decodedClientData = utf8Decoder.decode(clientDataJSON);
+  const clientDataObj = JSON.parse(decodedClientData);  
+  const clientDataObjStringified = JSON.stringify(clientDataObj)
+  console.log("clietn data obj: ", clientDataObj)
+  console.log("clietn data obj stringified: ", clientDataObjStringified)
+//   const midClientDataObj = JSON.stringify(decodedClientData)
+//   const prettierClientDataObj = JSON.stringify(clientDataObj)
+//   console.log("clientDataObj parse", clientDataObj);
+//   console.log("clientDataObj mid", midClientDataObj.replace(/^"|"$/g, '').replace(/\\"/g, '"'))
+//   console.log("prettierClientDataObj"), prettierClientDataObj;
   // @ts-ignore
   var authenticatorData = new Uint8Array(assertation.response.authenticatorData);
   console.log("authenticatorData", authenticatorData);
+  console.log("authenticatorDataToHex", toHex(authenticatorData));
 
   var clientDataHash = new Uint8Array(
     await crypto.subtle.digest("SHA-256", clientDataJSON)
@@ -126,10 +141,10 @@ async function handlePasskey() {
   const publicKeyArray = new Uint8Array(publicKeyBuffer);
   const x = toHex(publicKeyArray.slice(1, publicKeyArray.length / 2 + 1));
   const y = toHex(publicKeyArray.slice(publicKeyArray.length / 2 + 1));
-  const xToBigInt = hexToBigInt(toHex(x))
-  const yToBigInt = hexToBigInt(toHex(y))
-//   console.log("x from getPublicKey", x);
-//   console.log("y from getPublicKey", y);
+  const xToBigInt = hexToBigInt(x)
+  const yToBigInt = hexToBigInt(y)
+  console.log("x from getPublicKey", x);
+  console.log("y from getPublicKey", y);
 
   //   const publicKeyBytes = new Uint8Array(publicKey);
   //   console.log("public key bytes", publicKeyBytes);
@@ -190,7 +205,12 @@ async function handlePasskey() {
   const pubKeyToHex = `04${x.slice(2)}${y.slice(2)}`
   const isValidP256 = secp256r1.verify({r: rToBigInt, s: sToBigInt}, sha256(signedData), pubKeyToHex)
   console.log("isvalid p256: ", isValidP256)
-
+  console.log("R to bigint", rToBigInt)
+  console.log("S to bigint", sToBigInt)
+  console.log("Message hash", toHex(sha256(signedData)))
+  console.log("pubkey to hex", sha256(signedData))
+  console.log("xToBigInt", xToBigInt)
+  console.log("yToBigInt", yToBigInt)
 
   /*
   *
@@ -240,7 +260,7 @@ async function handlePasskey() {
   ]);  
 
 
-    const challengeBufferToUint8Array = new Uint8Array(getCredentialDefaultArgs.publicKey.challenge)
+const challengeBufferToUint8Array = new Uint8Array(getCredentialDefaultArgs.publicKey.challenge)
 
   const wasMessageValid = await publicClient.verifyMessage({
     address: undeployedSmartAccountAddress,
@@ -248,27 +268,6 @@ async function handlePasskey() {
     signature: sigFor6492Account,
   })  
 
-  console.log("was ethereum message valid, ", wasMessageValid)
-
-  // try to verify message directly on p256.sol verifier
-
-    //0xc2b78104907F722DABAc4C69f826a522B2754De4
-    const p256SolReturn = await optimismPublicClient.readContract({
-        address: "0xc2b78104907F722DABAc4C69f826a522B2754De4",
-        abi: p256SolAbi,
-        functionName: "verifySignature",
-        args: [
-            sha256(signedData),
-            rToBigInt,
-            sToBigInt,
-            xToBigInt,
-            yToBigInt
-        ],
-      });
-
-      console.log("p256Solreturn ", p256SolReturn)
-
-    //   {r: rToBigInt, s: sToBigInt}, sha256(signedData), pubKeyToHex)
 }
 
 export default function PasskeyScreen() {
