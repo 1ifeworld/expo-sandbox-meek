@@ -61,13 +61,28 @@ export const usePasskey = () => {
       case "web":
         {
           try {
+            console.log("challenge in signWithPasskey: ", challenge)
             // Creates params to requests passkey signer to sign your challenge
             const options: PublicKeyCredentialRequestOptions = {
-              timeout: 60000,
+              // timeout: 60000,
               challenge: Buffer.from(challenge.slice(2), "hex"),
               rpId: window.location.hostname,
               userVerification: "preferred",
             } as PublicKeyCredentialRequestOptions;
+
+
+            // allowCredentials?: PublicKeyCredentialDescriptor[];
+            // challenge: BufferSource;
+            // extensions?: AuthenticationExtensionsClientInputs;
+            // rpId?: string;
+            // timeout?: number;
+            // userVerification?: UserVerificationRequirement;            
+
+            console.log("window.location.hostname: ", window.location.hostname)
+
+            console.log('Buffer.from(challenge, "hex"): ', Buffer.from(challenge, "hex"))
+
+            console.log('options ', Buffer.from(challenge, "hex"))
 
             // Get creadentials with signature from challenge
             const credential = (await navigator.credentials.get({ publicKey: options })) as PublicKeyCredentialGetResponse;

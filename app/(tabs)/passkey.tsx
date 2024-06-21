@@ -162,13 +162,20 @@ export default function PasskeyScreen() {
       version: "1",
     });
     console.log("unhashed message: ", unhashedSiweMessage)
-    const hashedSiweMessage = hashMessage(unhashedSiweMessage);
+
+
+    const nonSiweUnhashedMessage = "unhashedMessage"
+    const hashedSiweMessage = hashMessage(nonSiweUnhashedMessage);
+    // const hashedSiweMessage = hashMessage(unhashedSiweMessage);
+
+    console.log("non siwe 6492")
+
     const replaySafeHash = await getSafeHash({
       ownersForPreDeployAcct: [encodedOwner],
       preDeployAcct: undeployedSmartAccountAddress,
       startingHash: hashedSiweMessage,
     });
-    // const dummyChallenge = "0x";
+    console.log("replaySafeHash: ", replaySafeHash)
     const signatureRequest = await signWithPasskey(replaySafeHash);
     console.log("signatureRequest: ", signatureRequest);
     if (!signatureRequest) return;
@@ -225,13 +232,21 @@ export default function PasskeyScreen() {
     console.log("sigFor6492Account", sigFor6492Account);
     console.log("sigFor6492Account -64", sigFor6492Account.slice(-64));
 
-    const was6492SiweSigValid = await publicClient.verifySiweMessage({
+    // const was6492SiweSigValid = await publicClient.verifySiweMessage({
+    //   address: undeployedSmartAccountAddress,
+    //   message: unhashedSiweMessage,
+    //   signature: sigFor6492Account,
+    // });
+
+    const wasMessageValid = await publicClient.verifyMessage({
       address: undeployedSmartAccountAddress,
       message: unhashedSiweMessage,
       signature: sigFor6492Account,
-    });
+    })
 
-    console.log("was6492SiweSigValid", was6492SiweSigValid);
+    // console.log("was6492SiweSigValid", was6492SiweSigValid);
+
+    console.log("wasMessageValid", wasMessageValid);    
   };
 
   function prepare6492SiweSigWithPasskeyigner() {}
