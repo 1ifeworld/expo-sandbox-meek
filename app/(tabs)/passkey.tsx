@@ -25,6 +25,7 @@ import {
   CoinbaseSmartWallet,
   coinbaseSignatureWrapperAbi,
 } from "../abi/CoinbaseSmartWallet";
+import { useState } from "react";
 
 const webauthnStructAbi = [
   {
@@ -111,15 +112,30 @@ function parseAuthenticatorData(buffer: Uint8Array) {
   };
 }
 
+interface PublicKeyCredentialCreateResponse extends PublicKeyCredential {
+  response: AuthenticatorAttestationResponse;
+}
+
+
 export default function PasskeyScreen() {
-  const [passkeyCedential, setPasskeyCredential] =
-    React.useState<PublicKeyCredential | null>();
+  const [passkeyCredential, setPasskeyCredential] =
+    React.useState<PublicKeyCredentialCreateResponse | null>();
+
   const { createPasskey, signWithPasskey } = usePasskey();
 
-  const onPressHandler = async () => {
-    const credential = await createPasskey();
+  const onPressHandler = async () => {    
+    let credential = passkeyCredential
+    if (!passkeyCredential) {
+      credential = await createPasskey();
+      setPasskeyCredential(credential)
+    }
+    
     console.log("credential", credential);
-    if (!credential) return;
+    if (!credential) {
+      console.log("no credential provided")
+      return;
+    } 
+
     const attestationObject = new Uint8Array(
       credential?.response.attestationObject
     );
@@ -130,7 +146,7 @@ export default function PasskeyScreen() {
     console.log("authData", authData);
 
     const publicKey = decode(authData?.COSEPublicKey);
-    console.log("public key", publicKey);
+    console.log("PUBLIC KEY", publicKey);
 
     const x = toHex(publicKey[-2]);
     const y = toHex(publicKey[-3]);
@@ -270,7 +286,7 @@ export default function PasskeyScreen() {
           theme="active">
           Sign with Passkey
         </Button>
-        {passkeyCedential && (
+        {passkeyCredential && (
           <>
             <Text>Passkey Signer: {}</Text>
             <Text>6492 Account: {}</Text>
