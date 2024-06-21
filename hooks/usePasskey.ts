@@ -4,8 +4,7 @@ import { Platform } from "react-native";
 import { Hex, toHex } from "viem";
 import { P256Credential } from "./types";
 import { parseSignature } from "./helpers";
-import { Buffer } from "buffer"
-
+import { Buffer } from "buffer";
 
 export const usePasskey = () => {
   const publicKey = {
@@ -19,7 +18,7 @@ export const usePasskey = () => {
       name: "ioey",
       displayName: "joey Doe",
     },
-    pubKeyCredParams: [{ type: "public-key", alg: -7 }]
+    pubKeyCredParams: [{ type: "public-key", alg: -7 }],
   } satisfies PublicKeyCredentialCreationOptions;
 
   const createPasskey = async () => {
@@ -31,8 +30,10 @@ export const usePasskey = () => {
         {
           try {
             // Creates a passkey that is stored locally on your device ie. iCloud
-            const credential = (await navigator.credentials.create({ publicKey })) as PublicKeyCredentialCreateResponse;
-            return credential 
+            const credential = (await navigator.credentials.create({
+              publicKey,
+            })) as PublicKeyCredentialCreateResponse;
+            return credential;
           } catch (e) {
             console.error(e);
           }
@@ -48,7 +49,9 @@ export const usePasskey = () => {
    * @param challenge Hex message to be signed with passkey publickey
    * @return P256Signature
    */
-  const signWithPasskey = async (challenge: Hex): Promise<P256Credential | undefined> => {
+  const signWithPasskey = async (
+    challenge: Hex
+  ): Promise<P256Credential | undefined> => {
     switch (Platform.OS) {
       case "ios": {
         /// TODO: See IOS daimo's passkey creadential here: https://github.com/daimo-eth/daimo/blob/master/packages/daimo-expo-passkeys/src/Passkey.ts
@@ -70,22 +73,30 @@ export const usePasskey = () => {
             } as PublicKeyCredentialRequestOptions;
 
             // Get creadentials with signature from challenge
-            const credential = (await navigator.credentials.get({ publicKey: options })) as PublicKeyCredentialGetResponse;
+            const credential = (await navigator.credentials.get({
+              publicKey: options,
+            })) as PublicKeyCredentialGetResponse;
 
             // Returns signature
             const utf8Decoder = new TextDecoder("utf-8");
-            const decodedClientData = utf8Decoder.decode(credential.response.clientDataJSON);
+            const decodedClientData = utf8Decoder.decode(
+              credential.response.clientDataJSON
+            );
             const clientDataObj = JSON.parse(decodedClientData);
-            let authenticatorData = toHex(new Uint8Array(credential.response.authenticatorData));
-            let signature = parseSignature(new Uint8Array(credential?.response?.signature));
+            let authenticatorData = toHex(
+              new Uint8Array(credential.response.authenticatorData)
+            );
+            let signature = parseSignature(
+              new Uint8Array(credential?.response?.signature)
+            );
             return {
               rawId: toHex(new Uint8Array(credential.rawId)),
               clientData: JSON.stringify({
                 type: clientDataObj.type,
-                challenge: clientDataObj.challenge,
+                challenge: toHex(clientDataObj.challenge),
                 origin: clientDataObj.origin,
                 crossOrigin: clientDataObj.crossOrigin,
-              }),
+              }).replace(/\"/g, "'"),
               authenticatorData,
               signature,
             };
