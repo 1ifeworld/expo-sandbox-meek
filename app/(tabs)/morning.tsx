@@ -2,7 +2,8 @@ import React from "react";
 import { View, Button, Text } from "tamagui";
 import { decode } from "cbor-x";
 import { Buffer } from "buffer";
-import { Hex, toHex, Address, encodeAbiParameters, hexToBigInt, Hash, concat } from "viem";
+import { Hex, toHex, Address, encodeAbiParameters, hexToBigInt, Hash, concat, createPublicClient, http } from "viem";
+import { optimismSepolia, optimism } from "viem/chains";
 import * as asn1js from "asn1js";
 import { PublicKeyInfo } from "pkijs";
 import { parseSignature } from "@/hooks/helpers";
@@ -13,9 +14,20 @@ import {
   CoinbaseSmartWallet,
   coinbaseSignatureWrapperAbi,
 } from "../abi/CoinbaseSmartWallet";
-// import { publicClient, webauthnStructAbi, getCreateAccountInitData } from "../ethereum";
+import { p256SolAbi } from "../abi/p256Sol";
+import { webauthnStructAbi, getCreateAccountInitData } from "../ethereum";
 import {secp256r1} from "@noble/curves/p256"
 import { sha256 } from '@noble/hashes/sha256'
+
+const publicClient = createPublicClient({
+    chain: optimismSepolia,
+    transport: http(),
+  });
+
+  const optimismPublicClient = createPublicClient({
+    chain: optimism,
+    transport: http(),
+  });
 
 async function handlePasskey() {
   var createCredentialDefaultArgs = {
@@ -114,9 +126,10 @@ async function handlePasskey() {
   const publicKeyArray = new Uint8Array(publicKeyBuffer);
   const x = toHex(publicKeyArray.slice(1, publicKeyArray.length / 2 + 1));
   const y = toHex(publicKeyArray.slice(publicKeyArray.length / 2 + 1));
-
-  console.log("x from getPublicKey", x);
-  console.log("y from getPublicKey", y);
+  const xToBigInt = hexToBigInt(toHex(x))
+  const yToBigInt = hexToBigInt(toHex(y))
+//   console.log("x from getPublicKey", x);
+//   console.log("y from getPublicKey", y);
 
   //   const publicKeyBytes = new Uint8Array(publicKey);
   //   console.log("public key bytes", publicKeyBytes);
@@ -172,14 +185,11 @@ async function handlePasskey() {
   console.log("verified", verified);
 
   // try separate verificaiton of p256
-//   const rToBigInt = hexToBigInt(toHex(r))
   const rToBigInt = hexToBigInt(toHex(r))
   const sToBigInt = hexToBigInt(toHex(s))
   const pubKeyToHex = `04${x.slice(2)}${y.slice(2)}`
   const isValidP256 = secp256r1.verify({r: rToBigInt, s: sToBigInt}, sha256(signedData), pubKeyToHex)
   console.log("isvalid p256: ", isValidP256)
-
-
 
 
   /*
@@ -188,47 +198,77 @@ async function handlePasskey() {
   *
   */
 
-//   // calculate encoded owner from pubkey x and y coords
-//   const encodedOwner = `0x${x.slice(2)}${y.slice(2)}` as Hex;
-//   // callculate undeployed smart account address
-//   const data = await publicClient.readContract({
-//     address: FACTORY_ADDRESS,
-//     abi: CoinbaseSmartWalletFactoryAbi,
-//     functionName: "getAddress",
-//     args: [[encodedOwner], BigInt(0)],
-//   });
-//   const undeployedSmartAccountAddress = data as Address;
-//   // Format web auth struct
-//   // NOTE: HUGE RED FLAG THE TYPE CONVERSIONS HERE COULD BE MESSING THINGS UP
-//   const webAuthnStruct = {
-//     authenticatorData: toHex(authenticatorData),
-//     clientDataJson: JSON.stringify(clientDataJSON), //JSON.stringify(clientDataJSON).replace(/[" ]/g, ""),
-//     challengeIndex: BigInt(23),
-//     typeIndex: BigInt(1),    
-//     r: hexToBigInt(toHex(r)),
-//     s: hexToBigInt(toHex(s))
-//   }
-//   const encodedWebAuthnStruct = encodeAbiParameters(webauthnStructAbi, [webAuthnStruct]);
-//   // Format signature
-//   const encodedSignatureWrapper: Hash = encodeAbiParameters(
-//     coinbaseSignatureWrapperAbi,
-//     [{ ownerIndex: BigInt(0), signatureData: encodedWebAuthnStruct }]
-//   );  
-//   const createAccountInitData = getCreateAccountInitData([
-//     undeployedSmartAccountAddress,
-//   ]);
-//   const sigFor6492Account: Hash = concat([
-//     encodeAbiParameters(
-//       [
-//         { name: "smartAccountFactory", type: "address" },
-//         { name: "createAccountInitData", type: "bytes" },
-//         { name: "encodedSigWrapper", type: "bytes" },
-//       ],
-//       [FACTORY_ADDRESS, createAccountInitData, encodedSignatureWrapper]
-//     ),
-//     ERC6492_DETECTION_SUFFIX,
-//   ]);  
+  // calculate encoded owner from pubkey x and y coords
+  const encodedOwner = `0x${x.slice(2)}${y.slice(2)}` as Hex;
+  // callculate undeployed smart account address
+  const data = await publicClient.readContract({
+    address: FACTORY_ADDRESS,
+    abi: CoinbaseSmartWalletFactoryAbi,
+    functionName: "getAddress",
+    args: [[encodedOwner], BigInt(0)],
+  });
+  const undeployedSmartAccountAddress = data as Address;
+  // Format web auth struct
+  // NOTE: HUGE RED FLAG THE TYPE CONVERSIONS HERE COULD BE MESSING THINGS UP
+  const webAuthnStruct = {
+    authenticatorData: toHex(authenticatorData),
+    clientDataJson: JSON.stringify(clientDataJSON), //JSON.stringify(clientDataJSON).replace(/[" ]/g, ""),
+    challengeIndex: BigInt(23),
+    typeIndex: BigInt(1),    
+    r: rToBigInt,
+    s: sToBigInt
+  }
+  const encodedWebAuthnStruct = encodeAbiParameters(webauthnStructAbi, [webAuthnStruct]);
+  // Format signature
+  const encodedSignatureWrapper: Hash = encodeAbiParameters(
+    coinbaseSignatureWrapperAbi,
+    [{ ownerIndex: BigInt(0), signatureData: encodedWebAuthnStruct }]
+  );  
+  const createAccountInitData = getCreateAccountInitData([
+    undeployedSmartAccountAddress,
+  ]);
+  const sigFor6492Account: Hash = concat([
+    encodeAbiParameters(
+      [
+        { name: "smartAccountFactory", type: "address" },
+        { name: "createAccountInitData", type: "bytes" },
+        { name: "encodedSigWrapper", type: "bytes" },
+      ],
+      [FACTORY_ADDRESS, createAccountInitData, encodedSignatureWrapper]
+    ),
+    ERC6492_DETECTION_SUFFIX,
+  ]);  
 
+
+    const challengeBufferToUint8Array = new Uint8Array(getCredentialDefaultArgs.publicKey.challenge)
+
+  const wasMessageValid = await publicClient.verifyMessage({
+    address: undeployedSmartAccountAddress,
+    message: { raw: challengeBufferToUint8Array },
+    signature: sigFor6492Account,
+  })  
+
+  console.log("was ethereum message valid, ", wasMessageValid)
+
+  // try to verify message directly on p256.sol verifier
+
+    //0xc2b78104907F722DABAc4C69f826a522B2754De4
+    const p256SolReturn = await optimismPublicClient.readContract({
+        address: "0xc2b78104907F722DABAc4C69f826a522B2754De4",
+        abi: p256SolAbi,
+        functionName: "verifySignature",
+        args: [
+            sha256(signedData),
+            rToBigInt,
+            sToBigInt,
+            xToBigInt,
+            yToBigInt
+        ],
+      });
+
+      console.log("p256Solreturn ", p256SolReturn)
+
+    //   {r: rToBigInt, s: sToBigInt}, sha256(signedData), pubKeyToHex)
 }
 
 export default function PasskeyScreen() {
