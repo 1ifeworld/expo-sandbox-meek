@@ -84,8 +84,12 @@ export const usePasskey = () => {
 
             console.log('options ', Buffer.from(challenge, "hex"))
 
+            console.log("navigator credentials in sign with passkey: ", navigator.credentials)
+
             // Get creadentials with signature from challenge
             const credential = (await navigator.credentials.get({ publicKey: options })) as PublicKeyCredentialGetResponse;
+
+            // if (userAgent.includes("Firefox")) {
 
             // Returns signature
             const utf8Decoder = new TextDecoder("utf-8");
@@ -94,13 +98,19 @@ export const usePasskey = () => {
             console.log("client data obj: ", clientDataObj)
             let authenticatorData = toHex(new Uint8Array(credential.response.authenticatorData));
             let signature = parseSignature(new Uint8Array(credential?.response?.signature));
+
+
+
+
+
+
+
             return {
               rawId: toHex(new Uint8Array(credential.rawId)),
-              clientData: //JSON.stringify({
+              clientData: 
                 clientDataObj,
                 authenticatorData,
                 signature
-            // }).replace( /" /g, "")
             };
           } catch (e) {
             console.error(e);

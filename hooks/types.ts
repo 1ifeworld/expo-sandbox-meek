@@ -10,13 +10,12 @@ export type CreateCredential = {
 
 export type P256Credential = {
   rawId: Hex;
-  clientData: string;
-  // {
-  //   type: string;
-  //   challenge: string;
-  //   origin: string;
-  //   crossOrigin: boolean;
-  // };
+  clientData: {
+    type: string;
+    challenge: string;
+    origin: string;
+    crossOrigin: boolean;
+  };
   authenticatorData: Hex;
   signature: P256Signature;
 };
