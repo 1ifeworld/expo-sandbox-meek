@@ -2,7 +2,21 @@ import React from "react";
 import { View, Button, Text } from "tamagui";
 import { decode } from "cbor-x";
 import { Buffer } from "buffer";
-import { Hex, toHex, Address, encodeAbiParameters, hexToBigInt, Hash, concat, createPublicClient, http, hexToString } from "viem";
+import {
+  Hex,
+  toHex,
+  Address,
+  encodeAbiParameters,
+  hexToBigInt,
+  Hash,
+  concat,
+  createPublicClient,
+  http,
+  hexToString,
+  hashMessage,
+  type PublicClient,
+  hexToBytes,
+} from "viem";
 import { optimismSepolia, optimism } from "viem/chains";
 import * as asn1js from "asn1js";
 import { PublicKeyInfo } from "pkijs";
@@ -14,21 +28,29 @@ import {
   CoinbaseSmartWallet,
   coinbaseSignatureWrapperAbi,
 } from "../abi/CoinbaseSmartWallet";
-import { webauthnStructAbi, getCreateAccountInitData } from "../ethereum";
-import {secp256r1} from "@noble/curves/p256"
-import { sha256 } from '@noble/hashes/sha256'
+import {
+  webauthnStructAbi,
+  getCreateAccountInitData,
+  getSafeHash,
+} from "../ethereum";
+import { secp256r1 } from "@noble/curves/p256";
+import { sha256 } from "@noble/hashes/sha256";
 
 const publicClient = createPublicClient({
-    chain: optimismSepolia,
-    transport: http(),
-  });
-
-  const optimismPublicClient = createPublicClient({
-    chain: optimism,
-    transport: http(),
-  });
+  chain: optimismSepolia,
+  transport: http(),
+});
 
 async function handlePasskey() {
+  /*
+   *
+   *    1. Ssetup inputs for paskey create credential
+   *    2. create passkey credential
+   *    3. get public key of credential and use to get undeployed smart account
+   *
+   */
+
+  // 1.
   var createCredentialDefaultArgs = {
     publicKey: {
       rp: {
@@ -56,25 +78,7 @@ async function handlePasskey() {
     },
   };
 
-  // sample arguments for login
-  var getCredentialDefaultArgs = {
-    publicKey: {
-      timeout: 60000,
-      // allowCredentials: [newCredential] // see below
-      challenge: new Uint8Array([
-        // must be a cryptographically random number sent from a server
-        0x79, 0x50, 0x68, 0x71, 0xda, 0xee, 0xee, 0xb9, 0x94, 0xc3, 0xc2, 0x15,
-        0x67, 0x65, 0x26, 0x22, 0xe3, 0xf3, 0xab, 0x3b, 0x78, 0x2e, 0xd5, 0x6f,
-        0x81, 0x26, 0xe2, 0xa6, 0x01, 0x7d, 0x74, 0x50,
-      ]).buffer,
-    },
-  };
-
-  console.log("challenge to hex", toHex(new Uint8Array(getCredentialDefaultArgs.publicKey.challenge)))
-//   var yo = getCredentialDefaultArgs.publicKey.challenge.toString('base64')
-//   var yo = b
-
-  // register / create a new credential
+  // 2.
   // @ts-ignore
   var cred = await navigator.credentials.create(createCredentialDefaultArgs);
 
@@ -83,42 +87,7 @@ async function handlePasskey() {
     return;
   }
 
-  var assertation = await navigator.credentials.get(getCredentialDefaultArgs);
-  console.log("assertson to JSON: ", JSON.stringify(assertation))
-  // @ts-ignore/
-  var signature = assertation.response.signature;
-  console.log("SIGNATURE", signature);
-  // @ts-ignore
-  var clientDataJSON = assertation.response.clientDataJSON;
-  const utf8Decoder = new TextDecoder("utf-8");
-  const decodedClientData = utf8Decoder.decode(clientDataJSON);
-  const clientDataObj = JSON.parse(decodedClientData);  
-  const clientDataObjStringified = JSON.stringify(clientDataObj)
-  console.log("clietn data obj: ", clientDataObj)
-  console.log("clietn data obj stringified: ", clientDataObjStringified)
-//   const midClientDataObj = JSON.stringify(decodedClientData)
-//   const prettierClientDataObj = JSON.stringify(clientDataObj)
-//   console.log("clientDataObj parse", clientDataObj);
-//   console.log("clientDataObj mid", midClientDataObj.replace(/^"|"$/g, '').replace(/\\"/g, '"'))
-//   console.log("prettierClientDataObj"), prettierClientDataObj;
-  // @ts-ignore
-  var authenticatorData = new Uint8Array(assertation.response.authenticatorData);
-  console.log("authenticatorData", authenticatorData);
-  console.log("authenticatorDataToHex", toHex(authenticatorData));
-
-  var clientDataHash = new Uint8Array(
-    await crypto.subtle.digest("SHA-256", clientDataJSON)
-  );
-  console.log("clientDataHash", clientDataHash);
-
-  // concat authenticatorData and clientDataHash
-  var signedData = new Uint8Array(
-    authenticatorData.length + clientDataHash.length
-  );
-  signedData.set(authenticatorData);
-  signedData.set(clientDataHash, authenticatorData.length);
-  console.log("signedData", signedData);
-
+  // 3.
   // get createCred public key and verify it vs other way of getting it/
   // @ts-ignore
   const publicKey = cred.response.getPublicKey();
@@ -141,36 +110,88 @@ async function handlePasskey() {
   const publicKeyArray = new Uint8Array(publicKeyBuffer);
   const x = toHex(publicKeyArray.slice(1, publicKeyArray.length / 2 + 1));
   const y = toHex(publicKeyArray.slice(publicKeyArray.length / 2 + 1));
-  const xToBigInt = hexToBigInt(x)
-  const yToBigInt = hexToBigInt(y)
+  const xToBigInt = hexToBigInt(x);
+  const yToBigInt = hexToBigInt(y);
   console.log("x from getPublicKey", x);
   console.log("y from getPublicKey", y);
 
-  //   const publicKeyBytes = new Uint8Array(publicKey);
-  //   console.log("public key bytes", publicKeyBytes);
-  //   const decodedPubKey = decodePubKey(publicKeyBytes)
-  //   console.log("decodedPubKey key bytes", decodedPubKey);
+  /*
+   *
+   *    4. Ssetup inputs for paskey GET credential
+   *    5. Get passkey credential
+   *    6. get public key of credential and use to get undeployed smart account
+   *
+   */
+
+  // 4.
+  // calculate encoded owner from pubkey x and y coords
+  const encodedOwner = `0x${x.slice(2)}${y.slice(2)}` as Hex;
+  // callculate undeployed smart account address
+  const data = await publicClient.readContract({
+    address: FACTORY_ADDRESS,
+    abi: CoinbaseSmartWalletFactoryAbi,
+    functionName: "getAddress",
+    args: [[encodedOwner], BigInt(0)],
+  });
+  const undeployedSmartAccountAddress = data as Address;
+
+  // must be a cryptographically random number sent from a server
+  const unhashedMessage = new Uint8Array([0x8c, 0x0a]).buffer; // THIS NEEDS TO BE REPRESENTED as `new Uint8Array([things]).buffer`
+  const hashedMessage = hashMessage(toHex(new Uint8Array(unhashedMessage)));
+  const replaySafeHash = await getSafeHash({
+    publicClient: publicClient as PublicClient,
+    ownersForPreDeployAcct: [encodedOwner],
+    preDeployAcct: undeployedSmartAccountAddress,
+    startingHash: hashedMessage,
+  });
+
+  var getCredentialDefaultArgs = {
+    publicKey: {
+      timeout: 60000,
+      // allowCredentials: [newCredential] // see below
+      challenge: hexToBytes(replaySafeHash),
+    },
+  };
+
+  console.log("getCred challenge to hex",toHex(new Uint8Array(getCredentialDefaultArgs.publicKey.challenge)));
+
+  var assertation = await navigator.credentials.get(getCredentialDefaultArgs);
+  console.log("assertatison to JSON: ", JSON.stringify(assertation));
+  // @ts-ignore/
+  var signature = assertation.response.signature;
+  console.log("SIGNATURE", signature);
+  // @ts-ignore
+  var clientDataJSON = assertation.response.clientDataJSON;
+  const utf8Decoder = new TextDecoder("utf-8");
+  const decodedClientData = utf8Decoder.decode(clientDataJSON);
+  const clientDataObj = JSON.parse(decodedClientData);
+  console.log("client data object", clientDataObj)
+  console.log("clientDataObj strinigify: ", JSON.stringify(clientDataObj))
+  var authenticatorData = new Uint8Array(
+    // @ts-ignore
+    assertation.response.authenticatorData
+  );
+  console.log("authenticatorData", authenticatorData);
+  console.log("authenticatorDataToHex", toHex(authenticatorData));
+
+  var clientDataHash = new Uint8Array(
+    await crypto.subtle.digest("SHA-256", clientDataJSON)
+  );
+  console.log("clientDataHash", clientDataHash);
+
+  // concat authenticatorData and clientDataHash
+  var signedData = new Uint8Array(
+    authenticatorData.length + clientDataHash.length
+  );
+  signedData.set(authenticatorData);
+  signedData.set(clientDataHash, authenticatorData.length);
+  console.log("signedData", signedData);
 
   // import key
   var key = await crypto.subtle.importKey(
-    // The getPublicKey() operation thus returns the credential public key as a SubjectPublicKeyInfo. See:
-    //
-    // https://w3c.github.io/webauthn/#sctn-public-key-easy
-    //
-    // crypto.subtle can import the spki format:
-    //
-    // https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto/importKey
     "spki", // "spki" Simple Public Key Infrastructure rfc2692
     publicKey,
     {
-      // these are the algorithm options
-      // await cred.response.getPublicKeyAlgorithm() // returns -7
-      // -7 is ES256 with P-256 // search -7 in https://w3c.github.io/webauthn
-      // the W3C webcrypto docs:
-      //
-      // https://www.w3.org/TR/WebCryptoAPI/#informative-references (scroll down a bit)
-      //
-      // ES256 corrisponds with the following AlgorithmIdentifier:
       name: "ECDSA",
       namedCurve: "P-256",
       hash: { name: "SHA-256" },
@@ -190,7 +211,6 @@ async function handlePasskey() {
 
   // check signature with public key and signed data
   var verified = await crypto.subtle.verify(
-    // { name: "ECDSA", namedCurve: "P-256", hash: { name: "SHA-256" } },
     { name: "ECDSA", hash: { name: "SHA-256" } },
     key,
     rawSignature,
@@ -200,50 +220,48 @@ async function handlePasskey() {
   console.log("verified", verified);
 
   // try separate verificaiton of p256
-  const rToBigInt = hexToBigInt(toHex(r))
-  const sToBigInt = hexToBigInt(toHex(s))
-  const pubKeyToHex = `04${x.slice(2)}${y.slice(2)}`
-  const isValidP256 = secp256r1.verify({r: rToBigInt, s: sToBigInt}, sha256(signedData), pubKeyToHex)
-  console.log("isvalid p256: ", isValidP256)
-  console.log("R to bigint", rToBigInt)
-  console.log("S to bigint", sToBigInt)
-  console.log("Message hash", toHex(sha256(signedData)))
-  console.log("pubkey to hex", sha256(signedData))
-  console.log("xToBigInt", xToBigInt)
-  console.log("yToBigInt", yToBigInt)
+  const rToBigInt = hexToBigInt(toHex(r));
+  const sToBigInt = hexToBigInt(toHex(s));
+  const pubKeyToHex = `04${x.slice(2)}${y.slice(2)}`;
+  const isValidP256 = secp256r1.verify(
+    { r: rToBigInt, s: sToBigInt },
+    sha256(signedData),
+    pubKeyToHex
+  );
+  console.log("isvalid p256: ", isValidP256);
+  console.log("R to bigint", rToBigInt);
+  console.log("S to bigint", sToBigInt);
+  console.log("Message hash", toHex(sha256(signedData)));
+  console.log("pubkey to hex", sha256(signedData));
+  console.log("xToBigInt", xToBigInt);
+  console.log("yToBigInt", yToBigInt);
 
   /*
-  *
-  * PORT VERIFIED MESSAGE INTO ETHEREUM
-  *
-  */
+   *
+   * PORT VERIFIED MESSAGE INTO ETHEREUM
+   *
+   */
 
-  // calculate encoded owner from pubkey x and y coords
-  const encodedOwner = `0x${x.slice(2)}${y.slice(2)}` as Hex;
-  // callculate undeployed smart account address
-  const data = await publicClient.readContract({
-    address: FACTORY_ADDRESS,
-    abi: CoinbaseSmartWalletFactoryAbi,
-    functionName: "getAddress",
-    args: [[encodedOwner], BigInt(0)],
-  });
-  const undeployedSmartAccountAddress = data as Address;
   // Format web auth struct
   // NOTE: HUGE RED FLAG THE TYPE CONVERSIONS HERE COULD BE MESSING THINGS UP
   const webAuthnStruct = {
     authenticatorData: toHex(authenticatorData),
-    clientDataJson: JSON.stringify(clientDataJSON), //JSON.stringify(clientDataJSON).replace(/[" ]/g, ""),
+    // clientDataJson: clientDataObj, //JSON.stringify(clientDataJSON).replace(/[" ]/g, ""),
+    clientDataJson: clientDataObj, //JSON.stringify(clientDataJSON).replace(/[" ]/g, ""),
     challengeIndex: BigInt(23),
-    typeIndex: BigInt(1),    
+    typeIndex: BigInt(1),
     r: rToBigInt,
-    s: sToBigInt
-  }
-  const encodedWebAuthnStruct = encodeAbiParameters(webauthnStructAbi, [webAuthnStruct]);
+    s: sToBigInt,
+  };
+  console.log("webauthnstruct: ", webAuthnStruct)
+  const encodedWebAuthnStruct = encodeAbiParameters(webauthnStructAbi, [
+    webAuthnStruct,
+  ]);
   // Format signature
   const encodedSignatureWrapper: Hash = encodeAbiParameters(
     coinbaseSignatureWrapperAbi,
     [{ ownerIndex: BigInt(0), signatureData: encodedWebAuthnStruct }]
-  );  
+  );
   const createAccountInitData = getCreateAccountInitData([
     undeployedSmartAccountAddress,
   ]);
@@ -257,17 +275,15 @@ async function handlePasskey() {
       [FACTORY_ADDRESS, createAccountInitData, encodedSignatureWrapper]
     ),
     ERC6492_DETECTION_SUFFIX,
-  ]);  
-
-
-const challengeBufferToUint8Array = new Uint8Array(getCredentialDefaultArgs.publicKey.challenge)
+  ]);
 
   const wasMessageValid = await publicClient.verifyMessage({
     address: undeployedSmartAccountAddress,
-    message: { raw: challengeBufferToUint8Array },
+    message: { raw: new Uint8Array(unhashedMessage)},
     signature: sigFor6492Account,
-  })  
+  });
 
+  console.log("was ethereum address valid, ", wasMessageValid)
 }
 
 export default function PasskeyScreen() {
