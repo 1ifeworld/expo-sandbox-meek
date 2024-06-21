@@ -176,8 +176,14 @@ export default function PasskeyScreen() {
       {
         authenticatorData: signatureRequest.authenticatorData,
         clientDataJson: signatureRequest.clientData,
-        challengeIndex: BigInt(1),
-        typeIndex: BigInt(0),
+        challengeIndex: BigInt(
+          //  "{'type':'webauthn.get','challenge':'...
+          // 'challenge' object starts at index position 23 in the clientData stringfy object
+          signatureRequest.clientData.indexOf('"challenge"')
+        ),
+        // "{'type':'webauthn.get','challenge':'...
+        // 'type' object starts at index position 1 in the clientData stringfy object
+        typeIndex: BigInt(signatureRequest.clientData.indexOf('"type"')),
         r: hexToBigInt(signatureRequest.signature.r),
         s: hexToBigInt(signatureRequest.signature.s),
       },
