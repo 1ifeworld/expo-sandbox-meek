@@ -45,7 +45,7 @@ function getCreateAccountInitData(accountOwners: Hash[]) {
   return encodeFunctionData({
     abi: parseAbi(["function createAccount(bytes[] owners, uint256 nonce)"]),
     functionName: "createAccount",
-    args: [accountOwners, 0],
+    args: [accountOwners, BigInt(0)],
   });
 }
 
@@ -161,6 +161,7 @@ export default function PasskeyScreen() {
       uri: "localhost:8081",
       version: "1",
     });
+    console.log("unhashed message: ", unhashedSiweMessage)
     const hashedSiweMessage = hashMessage(unhashedSiweMessage);
     const replaySafeHash = await getSafeHash({
       ownersForPreDeployAcct: [encodedOwner],
@@ -172,16 +173,28 @@ export default function PasskeyScreen() {
     console.log("signatureRequest: ", signatureRequest);
     if (!signatureRequest) return;
 
-    const encodedWebAuthnStruct = encodeAbiParameters(webauthnStructAbi, [
-      {
-        authenticatorData: signatureRequest.authenticatorData,
-        clientDataJson: signatureRequest.clientData,
-        challengeIndex: BigInt(1),
-        typeIndex: BigInt(0),
-        r: hexToBigInt(signatureRequest.signature.r),
-        s: hexToBigInt(signatureRequest.signature.s),
-      },
-    ]);
+    let cred = credential as unknown as {
+      rawId: ArrayBuffer;
+      response: {
+        clientDataJSON: ArrayBuffer;
+        authenticatorData: ArrayBuffer;
+        signature: ArrayBuffer;
+        userHandle: ArrayBuffer;
+      };
+    };
+
+    const webAuthnStruct = {
+      authenticatorData: signatureRequest.authenticatorData,
+      clientDataJson: JSON.stringify(signatureRequest.clientData).replace(/[" ]/g, ""),
+      challengeIndex: BigInt(23), // BigInt(signatureRequest.clientData.indexOf("'challenge'")),
+      typeIndex: BigInt(1), //BigInt(signatureRequest.clientData.indexOf("'type'")),        
+      r: hexToBigInt(signatureRequest.signature.r),
+      s: hexToBigInt(signatureRequest.signature.s),      
+    }
+
+    console.log("webAuthnStruct", webAuthnStruct);
+
+    const encodedWebAuthnStruct = encodeAbiParameters(webauthnStructAbi, [webAuthnStruct]);
 
     console.log("encoded webautn struct", encodedWebAuthnStruct);
 
@@ -208,6 +221,9 @@ export default function PasskeyScreen() {
       ),
       ERC6492_DETECTION_SUFFIX,
     ]);
+
+    console.log("sigFor6492Account", sigFor6492Account);
+    console.log("sigFor6492Account -64", sigFor6492Account.slice(-64));
 
     const was6492SiweSigValid = await publicClient.verifySiweMessage({
       address: undeployedSmartAccountAddress,

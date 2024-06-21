@@ -76,18 +76,16 @@ export const usePasskey = () => {
             const utf8Decoder = new TextDecoder("utf-8");
             const decodedClientData = utf8Decoder.decode(credential.response.clientDataJSON);
             const clientDataObj = JSON.parse(decodedClientData);
+            console.log("client data obj: ", clientDataObj)
             let authenticatorData = toHex(new Uint8Array(credential.response.authenticatorData));
             let signature = parseSignature(new Uint8Array(credential?.response?.signature));
             return {
               rawId: toHex(new Uint8Array(credential.rawId)),
-              clientData: JSON.stringify({
-                type: clientDataObj.type,
-                challenge: clientDataObj.challenge,
-                origin: clientDataObj.origin,
-                crossOrigin: clientDataObj.crossOrigin,
-              }),
-              authenticatorData,
-              signature,
+              clientData: //JSON.stringify({
+                clientDataObj,
+                authenticatorData,
+                signature
+            // }).replace( /" /g, "")
             };
           } catch (e) {
             console.error(e);
