@@ -11,7 +11,7 @@ import {
 import { PublicKeyInfo } from "pkijs";
 import * as asn1js from "asn1js";
 import { CoinbaseSmartWallet } from "./app/abi/CoinbaseSmartWallet";
-
+// factory deployed on optimism sepolia
 export const FACTORY_ADDRESS = "0xabc14A381ab1BC4750eb08D11E5e29506e68c1b9";
 export const ERC6492_DETECTION_SUFFIX =
   "0x6492649264926492649264926492649264926492649264926492649264926492";
