@@ -1,11 +1,20 @@
 import { Buffer } from "buffer";
-import { toHex, Hex, PublicClient, Hash, Address, encodeFunctionData, parseAbi } from "viem";
+import {
+  toHex,
+  Hex,
+  PublicClient,
+  Hash,
+  Address,
+  encodeFunctionData,
+  parseAbi,
+} from "viem";
 import { PublicKeyInfo } from "pkijs";
 import * as asn1js from "asn1js";
 import { CoinbaseSmartWallet } from "./app/abi/CoinbaseSmartWallet";
 
 export const FACTORY_ADDRESS = "0xabc14A381ab1BC4750eb08D11E5e29506e68c1b9";
-export const ERC6492_DETECTION_SUFFIX = "0x6492649264926492649264926492649264926492649264926492649264926492";
+export const ERC6492_DETECTION_SUFFIX =
+  "0x6492649264926492649264926492649264926492649264926492649264926492";
 
 export function extractPublicKey(credential: Credential): { x: Hex; y: Hex } {
   // @ts-ignore
@@ -31,33 +40,33 @@ export function extractPublicKey(credential: Credential): { x: Hex; y: Hex } {
 }
 
 export async function getSafeHash({
-    publicClient,
-    ownerForPreDeployAcct,
-    preDeployAcct,
-    startingHash,
-  }: {
-    publicClient: PublicClient,
-    ownerForPreDeployAcct: Hash;
-    preDeployAcct: Address;
-    startingHash: Hash;
-  }): Promise<Hash> {
-    const data = await publicClient.readContract({
-      // Address of the Smart Account deployer (factory).
-      factory: FACTORY_ADDRESS,
-      // Function to execute on the factory to deploy the Smart Account.
-      factoryData: encodeFunctionData({
-        abi: parseAbi(["function createAccount(bytes[] owners, uint256 nonce)"]),
-        functionName: "createAccount",
-        args: [[ownerForPreDeployAcct], BigInt(0)],
-      }),
-      // Function to call on the Smart Account.
-      abi: CoinbaseSmartWallet,
-      address: preDeployAcct,
-      functionName: "replaySafeHash",
-      args: [startingHash],
-    });
-    return data;
-  }
+  publicClient,
+  ownerForPreDeployAcct,
+  preDeployAcct,
+  startingHash,
+}: {
+  publicClient: PublicClient;
+  ownerForPreDeployAcct: Hash;
+  preDeployAcct: Address;
+  startingHash: Hash;
+}): Promise<Hash> {
+  const data = await publicClient.readContract({
+    // Address of the Smart Account deployer (factory).
+    factory: FACTORY_ADDRESS,
+    // Function to execute on the factory to deploy the Smart Account.
+    factoryData: encodeFunctionData({
+      abi: parseAbi(["function createAccount(bytes[] owners, uint256 nonce)"]),
+      functionName: "createAccount",
+      args: [[ownerForPreDeployAcct], BigInt(0)],
+    }),
+    // Function to call on the Smart Account.
+    abi: CoinbaseSmartWallet,
+    address: preDeployAcct,
+    functionName: "replaySafeHash",
+    args: [startingHash],
+  });
+  return data;
+}
 
 export function parseAuthenticatorData(buffer: Uint8Array) {
   const rpIdHash = buffer.slice(0, 32);
@@ -105,7 +114,7 @@ export const createCredentialDefaultArgs = {
         alg: -7,
       },
     ],
-    attestation: "direct",
+    // attestation: "direct",
     challenge: new Uint8Array([
       // must be a cryptographically random number sent from a server
       0x8c, 0x0a, 0x26, 0xff, 0x22, 0x91, 0xc1, 0xe9, 0xb9, 0x4e, 0x2e, 0x17,
@@ -115,25 +124,61 @@ export const createCredentialDefaultArgs = {
   },
 };
 
-export const webauthnStructAbi = [
+/* this version matches whats in solidity but not how coinbase tx utils work */
+// const WebAuthnAuthStruct = {
+//   components: [
+//     {
+//       name: "authenticatorData",
+//       type: "bytes",
+//     },
+//     { name: "clientDataJSON", type: "bytes" },
+//     { name: "challengeIndex", type: "uint256" },
+//     { name: "typeIndex", type: "uint256" },
+//     {
+//       name: "r",
+//       type: "uint256",
+//     },
+//     {
+//       name: "s",
+//       type: "uint256",
+//     },
+//   ],
+//   name: "WebAuthnAuth",
+//   type: "tuple",
+// };
+
+export const webauthnStructAbi = {
+  components: [
+    { name: "authenticatorData", type: "bytes" },
+    { name: "clientDataJSON", type: "bytes" },
+    { name: "challengeIndex", type: "uint256" },
+    { name: "typeIndex", type: "uint256" },
+    { name: "r", type: "uint256" },
+    { name: "s", type: "uint256" },
+  ],
+  name: "WebAuthnAuth",
+  type: "tuple",
+};
+
+export const signatureWrapperStructAbi = {
+  components: [
     {
-      components: [
-        { name: "authenticatorData", type: "bytes" },
-        { name: "clientDataJson", type: "string" },
-        { name: "challengeIndex", type: "uint256" },
-        { name: "typeIndex", type: "uint256" },
-        { name: "r", type: "uint256" },
-        { name: "s", type: "uint256" },
-      ],
-      name: "WebAuthnAuth",
-      type: "tuple",
+      name: "ownerIndex",
+      type: "uint8",
     },
-  ] as const;
-  
-  export function getCreateAccountInitData(accountOwners: Hash[]) {
-    return encodeFunctionData({
-      abi: parseAbi(["function createAccount(bytes[] owners, uint256 nonce)"]),
-      functionName: "createAccount",
-      args: [accountOwners, BigInt(0)],
-    });
-  }  
+    {
+      name: "signatureData",
+      type: "bytes",
+    },
+  ],
+  name: "SignatureWrapper",
+  type: "tuple",
+};
+
+export function getCreateAccountInitData(accountOwners: Hash[]) {
+  return encodeFunctionData({
+    abi: parseAbi(["function createAccount(bytes[] owners, uint256 nonce)"]),
+    functionName: "createAccount",
+    args: [accountOwners, BigInt(0)],
+  });
+}

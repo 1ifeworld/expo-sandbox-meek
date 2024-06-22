@@ -14,6 +14,7 @@ import {
   hexToBigInt,
   encodeAbiParameters,
   concat,
+  stringToHex,
 } from "viem";
 import { optimismSepolia } from "viem/chains";
 import {
@@ -23,14 +24,15 @@ import {
   webauthnStructAbi,
   getCreateAccountInitData,
   ERC6492_DETECTION_SUFFIX,
+  signatureWrapperStructAbi,
 } from "@/helpers";
 import { FACTORY_ADDRESS } from "../ethereum";
 import { CoinbaseSmartWalletFactoryAbi } from "../abi/CoinbaseSmartWalletFactory";
-import { coinbaseSignatureWrapperAbi } from "../abi/CoinbaseSmartWallet";
 import { secp256r1 } from "@noble/curves/p256";
 import { sha256 } from "@noble/hashes/sha256";
 import base64url from "base64url";
 import { parseErc6492Signature, isErc6492Signature } from "viem/experimental";
+import { base64urlnopad } from "@scure/base";
 
 export default function HomeScreen() {
   /*
@@ -154,21 +156,39 @@ export default function HomeScreen() {
      *
      */
 
+    const base64UrlReplaySafeHash = base64urlnopad.encode(
+      hexToBytes(replaySafeHash)
+    );
+    console.log({ base64UrlReplaySafeHash });
+    console.log({ cDBO: clientDataObj.challenge });
+    const equal = base64UrlReplaySafeHash == clientDataObj.challenge;
+    console.log({ equal });
+
     const clientDataJsonString = `{"type":"webauthn.get","challenge":"${clientDataObj.challenge}","origin":"http://localhost:8081"}`;
     const webAuthnStruct = {
       authenticatorData: toHex(authenticatorData),
-      clientDataJson: clientDataJsonString,
-      challengeIndex: BigInt(23),
-      typeIndex: BigInt(1),
+      clientDataJSON: stringToHex(clientDataJsonString),
+      challengeIndex: clientDataJsonString.indexOf('"challenge":'),
+      typeIndex: clientDataJsonString.indexOf('"type":'),
       r: rToBigInt,
       s: sToBigInt,
     };
     console.log({ webAuthnStruct });
-    const encodedWebAuthnStruct = encodeAbiParameters(webauthnStructAbi, [
-      webAuthnStruct,
-    ]);
+    const encodedWebAuthnStruct = encodeAbiParameters(
+      [webauthnStructAbi],
+      [
+        {
+          authenticatorData: webAuthnStruct.authenticatorData,
+          clientDataJSON: webAuthnStruct.clientDataJSON,
+          challengeIndex: webAuthnStruct.challengeIndex,
+          typeIndex: webAuthnStruct.typeIndex,
+          r: webAuthnStruct.r,
+          s: webAuthnStruct.s,
+        },
+      ]
+    );
     const encodedSignatureWrapper: Hash = encodeAbiParameters(
-      coinbaseSignatureWrapperAbi,
+      [signatureWrapperStructAbi],
       [{ ownerIndex: BigInt(0), signatureData: encodedWebAuthnStruct }]
     );
     const createAccountInitData = getCreateAccountInitData([
@@ -196,6 +216,7 @@ export default function HomeScreen() {
     console.log({ factoryInitData });
     console.log({ erc6492SigOnlySig });
     console.log({ sig6492FormatCheck });
+    console.log({ sigFor6492Account });
 
     const validEthSig = await publicClient.verifyMessage({
       address: undeployedSmartAccountAddress,
@@ -204,6 +225,16 @@ export default function HomeScreen() {
     });
 
     console.log({ validEthSig });
+
+    /* LOGS FOR FOUNDRY TESTING */
+
+    const xBigInt = hexToBigInt(publicKey.x);
+    const yBigInt = hexToBigInt(publicKey.y);
+    console.log({ xBigInt });
+    console.log({ yBigInt });
+    console.log({ rToBigInt });
+    console.log({ sToBigInt });
+    console.log({ replaySafeHash });
   }
 
   return (
