@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { View, Button, Text } from "tamagui";
+import { Buffer } from "buffer";
 import {
   Hex,
   Address,
@@ -11,17 +12,25 @@ import {
   toHex,
   hexToBytes,
   hexToBigInt,
+  encodeAbiParameters,
+  concat,
 } from "viem";
 import { optimismSepolia } from "viem/chains";
 import {
   extractPublicKey,
   createCredentialDefaultArgs,
   getSafeHash,
+  webauthnStructAbi,
+  getCreateAccountInitData,
+  ERC6492_DETECTION_SUFFIX,
 } from "@/helpers";
 import { FACTORY_ADDRESS } from "../ethereum";
 import { CoinbaseSmartWalletFactoryAbi } from "../abi/CoinbaseSmartWalletFactory";
+import { coinbaseSignatureWrapperAbi } from "../abi/CoinbaseSmartWallet";
 import { secp256r1 } from "@noble/curves/p256";
 import { sha256 } from "@noble/hashes/sha256";
+import base64url from "base64url";
+import { parseErc6492Signature, isErc6492Signature } from "viem/experimental";
 
 export default function HomeScreen() {
   /*
@@ -49,7 +58,7 @@ export default function HomeScreen() {
    *
    * CREATE PASSKEY
    *
-   */    
+   */
 
   async function handleCreateCredential() {
     const credential = await navigator.credentials.create(
@@ -67,7 +76,7 @@ export default function HomeScreen() {
    *
    * SIGN WITH PASSKEY
    *
-   */      
+   */
 
   async function handleSignForCredential() {
     if (!publicKey || !encodedOwner) return;
@@ -92,14 +101,17 @@ export default function HomeScreen() {
         challenge: hexToBytes(replaySafeHash),
       },
     };
+
     const assertion = await navigator.credentials.get(getCredentialDefaultArgs);
     // @ts-ignore/
     const signature = assertion.response.signature;
     // @ts-ignore
     const clientDataJSON = assertion.response.clientDataJSON;
-    const utf8Decoder = new TextDecoder("utf-8");
-    const decodedClientData = utf8Decoder.decode(clientDataJSON);
-    const clientDataObj = JSON.parse(decodedClientData);
+    // Step 1: Convert ArrayBuffer to string using TextDecoder
+    const clientDataString = new TextDecoder().decode(clientDataJSON);
+    // Step 2: Parse the JSON string
+    const clientDataObj = JSON.parse(clientDataString);
+    console.log({ clientDataObj });
     const authenticatorData = new Uint8Array(
       // @ts-ignore
       assertion.response.authenticatorData
@@ -131,7 +143,67 @@ export default function HomeScreen() {
       messageHashForp256Sig,
       pubKeyToHex
     );
-    console.log("isvalid p256: ", isValidP256);
+
+    console.log("Encoded Owner: ", encodedOwner);
+    console.log("Predeploy Address: ", undeployedSmartAccountAddress);
+    console.log("Valid P256 Signature: ", isValidP256);
+
+    /*
+     *
+     * ETHEREUM VERIFICATION
+     *
+     */
+
+    const clientDataJsonString = `{"type":"webauthn.get","challenge":"${clientDataObj.challenge}","origin":"http://localhost:8081"}`;
+    const webAuthnStruct = {
+      authenticatorData: toHex(authenticatorData),
+      clientDataJson: clientDataJsonString,
+      challengeIndex: BigInt(23),
+      typeIndex: BigInt(1),
+      r: rToBigInt,
+      s: sToBigInt,
+    };
+    console.log({ webAuthnStruct });
+    const encodedWebAuthnStruct = encodeAbiParameters(webauthnStructAbi, [
+      webAuthnStruct,
+    ]);
+    const encodedSignatureWrapper: Hash = encodeAbiParameters(
+      coinbaseSignatureWrapperAbi,
+      [{ ownerIndex: BigInt(0), signatureData: encodedWebAuthnStruct }]
+    );
+    const createAccountInitData = getCreateAccountInitData([
+      undeployedSmartAccountAddress,
+    ]);
+    const sigFor6492Account: Hash = concat([
+      encodeAbiParameters(
+        [
+          { name: "smartAccountFactory", type: "address" },
+          { name: "createAccountInitData", type: "bytes" },
+          { name: "encodedSigWrapper", type: "bytes" },
+        ],
+        [FACTORY_ADDRESS, createAccountInitData, encodedSignatureWrapper]
+      ),
+      ERC6492_DETECTION_SUFFIX,
+    ]);
+    const {
+      address: factoryAddress,
+      data: factoryInitData,
+      signature: erc6492SigOnlySig,
+    } = parseErc6492Signature(sigFor6492Account);
+    const sig6492FormatCheck = isErc6492Signature(sigFor6492Account);
+
+    console.log({ factoryAddress });
+    console.log({ factoryInitData });
+    console.log({ erc6492SigOnlySig });
+    console.log({ sig6492FormatCheck });
+
+    const validEthSig = await publicClient.verifyMessage({
+      address: undeployedSmartAccountAddress,
+      message: toHex(new Uint8Array(unhashedMessage)),
+      signature: sigFor6492Account,
+    });
+
+    console.log({ validEthSig });
   }
 
   return (
@@ -163,4 +235,23 @@ export default function HomeScreen() {
       </View>
     </View>
   );
+}
+
+function base64UrlToBase64(base64Url: any) {
+  return base64Url.replace(/-/g, "+").replace(/_/g, "/");
+}
+
+// Convert ArrayBuffer to string
+function arrayBufferToString(buffer: any) {
+  return new TextDecoder().decode(buffer);
+}
+
+function base64ToBytes(base64: any) {
+  const binaryString = atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
 }

@@ -2,8 +2,10 @@ import { Buffer } from "buffer";
 import { toHex, Hex, PublicClient, Hash, Address, encodeFunctionData, parseAbi } from "viem";
 import { PublicKeyInfo } from "pkijs";
 import * as asn1js from "asn1js";
-import { FACTORY_ADDRESS } from "./app/ethereum";
 import { CoinbaseSmartWallet } from "./app/abi/CoinbaseSmartWallet";
+
+export const FACTORY_ADDRESS = "0xabc14A381ab1BC4750eb08D11E5e29506e68c1b9";
+export const ERC6492_DETECTION_SUFFIX = "0x6492649264926492649264926492649264926492649264926492649264926492";
 
 export function extractPublicKey(credential: Credential): { x: Hex; y: Hex } {
   // @ts-ignore
@@ -112,3 +114,26 @@ export const createCredentialDefaultArgs = {
     ]).buffer,
   },
 };
+
+export const webauthnStructAbi = [
+    {
+      components: [
+        { name: "authenticatorData", type: "bytes" },
+        { name: "clientDataJson", type: "string" },
+        { name: "challengeIndex", type: "uint256" },
+        { name: "typeIndex", type: "uint256" },
+        { name: "r", type: "uint256" },
+        { name: "s", type: "uint256" },
+      ],
+      name: "WebAuthnAuth",
+      type: "tuple",
+    },
+  ] as const;
+  
+  export function getCreateAccountInitData(accountOwners: Hash[]) {
+    return encodeFunctionData({
+      abi: parseAbi(["function createAccount(bytes[] owners, uint256 nonce)"]),
+      functionName: "createAccount",
+      args: [accountOwners, BigInt(0)],
+    });
+  }  
