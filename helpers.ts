@@ -1,4 +1,3 @@
-import { Buffer } from "buffer";
 import {
   toHex,
   Hex,
@@ -11,10 +10,37 @@ import {
 import { PublicKeyInfo } from "pkijs";
 import * as asn1js from "asn1js";
 import { CoinbaseSmartWallet } from "./app/abi/CoinbaseSmartWallet";
+
 // factory deployed on optimism sepolia
 export const FACTORY_ADDRESS = "0xabc14A381ab1BC4750eb08D11E5e29506e68c1b9";
 export const ERC6492_DETECTION_SUFFIX =
   "0x6492649264926492649264926492649264926492649264926492649264926492";
+
+export const createCredentialDefaultArgs = {
+  publicKey: {
+    rp: {
+      name: "Acme",
+    },
+    user: {
+      id: new Uint8Array(16),
+      name: "john.p.smith@example.com",
+      displayName: "John P. Smith",
+    },
+    pubKeyCredParams: [
+      {
+        type: "public-key",
+        alg: -7,
+      },
+    ],
+    // attestation: "direct",
+    challenge: new Uint8Array([
+      // must be a cryptographically random number sent from a server
+      0x8c, 0x0a, 0x26, 0xff, 0x22, 0x91, 0xc1, 0xe9, 0xb9, 0x4e, 0x2e, 0x17,
+      0x1a, 0x98, 0x6a, 0x73, 0x71, 0x9d, 0x43, 0x48, 0xd5, 0xa7, 0x6a, 0x15,
+      0x7e, 0x38, 0x94, 0x52, 0x77, 0x97, 0x0f, 0xef,
+    ]).buffer,
+  },
+};
 
 export function extractPublicKey(credential: Credential): { x: Hex; y: Hex } {
   // @ts-ignore
@@ -68,34 +94,16 @@ export async function getSafeHash({
   return data;
 }
 
-export const createCredentialDefaultArgs = {
-  publicKey: {
-    rp: {
-      name: "Acme",
-    },
-    user: {
-      id: new Uint8Array(16),
-      name: "john.p.smith@example.com",
-      displayName: "John P. Smith",
-    },
-    pubKeyCredParams: [
-      {
-        type: "public-key",
-        alg: -7,
-      },
-    ],
-    // attestation: "direct",
-    challenge: new Uint8Array([
-      // must be a cryptographically random number sent from a server
-      0x8c, 0x0a, 0x26, 0xff, 0x22, 0x91, 0xc1, 0xe9, 0xb9, 0x4e, 0x2e, 0x17,
-      0x1a, 0x98, 0x6a, 0x73, 0x71, 0x9d, 0x43, 0x48, 0xd5, 0xa7, 0x6a, 0x15,
-      0x7e, 0x38, 0x94, 0x52, 0x77, 0x97, 0x0f, 0xef,
-    ]).buffer,
-  },
-};
+export function getCreateAccountInitData(accountOwners: Hash[]) {
+  return encodeFunctionData({
+    abi: parseAbi(["function createAccount(bytes[] owners, uint256 nonce)"]),
+    functionName: "createAccount",
+    args: [accountOwners, BigInt(0)],
+  });
+}
 
 /* this version matches whats in solidity but not how coinbase tx utils work */
-// const WebAuthnAuthStruct = {
+// const webauthnStructAbi = {
 //   components: [
 //     {
 //       name: "authenticatorData",
@@ -130,6 +138,18 @@ export const webauthnStructAbi = {
   type: "tuple",
 };
 
+/* this version matches whats in solidity but not how coinbase tx utils work */
+// export const signatureWrapperStructAbi = [
+//     {
+//       components: [
+//         { name: "ownerIndex", type: "uint256" },
+//         { name: "signatureData", type: "bytes" },
+//       ],
+//       name: "SignatureWrapper",
+//       type: "tuple",
+//     },
+//   ] as const;
+
 export const signatureWrapperStructAbi = {
   components: [
     {
@@ -144,11 +164,3 @@ export const signatureWrapperStructAbi = {
   name: "SignatureWrapper",
   type: "tuple",
 };
-
-export function getCreateAccountInitData(accountOwners: Hash[]) {
-  return encodeFunctionData({
-    abi: parseAbi(["function createAccount(bytes[] owners, uint256 nonce)"]),
-    functionName: "createAccount",
-    args: [accountOwners, BigInt(0)],
-  });
-}

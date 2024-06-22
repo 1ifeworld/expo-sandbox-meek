@@ -30,7 +30,6 @@
     "@tamagui/config": "^1.100.3",
     "@tamagui/metro-plugin": "^1.100.3",
     "@walletconnect/modal-react-native": "^1.1.0",
-    "base64url": "^3.0.1",
     "buffer": "^6.0.3",
     "cbor": "^9.0.2",
     "cbor-x": "^1.5.9",

@@ -1,6 +1,5 @@
 import React, { useState } from "react";
-import { View, Button, Text } from "tamagui";
-import { Buffer } from "buffer";
+import { View, Button } from "tamagui";
 import {
   Hex,
   Address,
@@ -29,8 +28,6 @@ import {
 import { FACTORY_ADDRESS } from "../ethereum";
 import { CoinbaseSmartWalletFactoryAbi } from "../abi/CoinbaseSmartWalletFactory";
 import { secp256r1 } from "@noble/curves/p256";
-import { sha256 } from "@noble/hashes/sha256";
-import base64url from "base64url";
 import { parseErc6492Signature, isErc6492Signature } from "viem/experimental";
 import { base64urlnopad } from "@scure/base";
 
@@ -266,23 +263,4 @@ export default function HomeScreen() {
       </View>
     </View>
   );
-}
-
-function base64UrlToBase64(base64Url: any) {
-  return base64Url.replace(/-/g, "+").replace(/_/g, "/");
-}
-
-// Convert ArrayBuffer to string
-function arrayBufferToString(buffer: any) {
-  return new TextDecoder().decode(buffer);
-}
-
-function base64ToBytes(base64: any) {
-  const binaryString = atob(base64);
-  const len = binaryString.length;
-  const bytes = new Uint8Array(len);
-  for (let i = 0; i < len; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
-  }
-  return bytes;
 }
