@@ -221,6 +221,7 @@ export default function HomeScreen() {
       signature: sigFor6492Account,
     });
 
+    console.log("is hashed = to hash", hashedMessage == hashMessage(toHex(new Uint8Array(unhashedMessage))))
     console.log({ validEthSig });
 
     /* LOGS FOR FOUNDRY TESTING */
