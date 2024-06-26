@@ -15,6 +15,7 @@ import { optimismSepolia } from "viem/chains";
 import { AsnParser } from "@peculiar/asn1-schema";
 import { ECDSASigValue } from "@peculiar/asn1-ecc";
 import { decode, encode } from "cbor-x";
+import { parseAuthenticatorData } from "@simplewebauthn/server/script/helpers";
 
 /// @dev VIEM setup
 const publicClient = createPublicClient({
@@ -61,10 +62,15 @@ export default function passkey() {
     navigator.credentials.create({ publicKey }).then((credential) => {
       setCreateCredential(credential as PublicKeyCredential);
       console.log("1. createCredential", credential);
-      const data = decode(
+      const attestationObject = decode(
         new Uint8Array(credential.response.attestationObject)
       );
-      console.log("1.1 ", data);
+      console.log("1.1 attestationObject", attestationObject);
+      const decoder = new TextDecoder();
+      const clientDataJSON = decoder.decode(credential.response.clientDataJSON);
+      console.log("1.2 clientDataJSON", clientDataJSON);
+      const authData = parseAuthenticatorData(attestationObject.authData);
+      console.log("1.3 authData", authData);
     });
   }
 

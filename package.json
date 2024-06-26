@@ -22,6 +22,7 @@
     "@react-native-async-storage/async-storage": "1.23.1",
     "@react-native-community/netinfo": "11.3.1",
     "@react-navigation/native": "^6.0.2",
+    "@simplewebauthn/server": "^10.0.0",
     "@tamagui/babel-plugin": "^1.100.3",
     "@tamagui/config": "^1.100.3",
     "@tamagui/metro-plugin": "^1.100.3",
