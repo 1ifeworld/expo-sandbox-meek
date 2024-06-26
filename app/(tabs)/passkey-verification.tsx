@@ -60,6 +60,7 @@ export default function passkey() {
     publicKey: PublicKeyCredentialCreationOptions
   ) {
     navigator.credentials.create({ publicKey }).then((credential) => {
+      if (!credential) return;
       setCreateCredential(credential as PublicKeyCredential);
       console.log("1. createCredential", credential);
       const attestationObject = decode(
@@ -71,6 +72,10 @@ export default function passkey() {
       console.log("1.2 clientDataJSON", clientDataJSON);
       const authData = parseAuthenticatorData(attestationObject.authData);
       console.log("1.3 authData", authData);
+      const publicKey = decode(authData.credentialPublicKey);
+      console.log("1.4 publicKey", publicKey);
+      localStorage.setItem("x", toHex(publicKey[-2]));
+      localStorage.setItem("y", toHex(publicKey[-3]));
     });
   }
 
@@ -81,8 +86,7 @@ export default function passkey() {
     navigator.credentials.get({ publicKey }).then((credential) => {
       console.log("2. getCredential", credential);
       setGetCredential(credential as PublicKeyCredential);
-      // @ts-ignore
-      verify(credential?.response);
+      verify(credential.response);
     });
   }
 
