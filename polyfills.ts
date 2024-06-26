@@ -1,1 +1,2 @@
 import "fastestsmallesttextencoderdecoder";
+import "buffer";
