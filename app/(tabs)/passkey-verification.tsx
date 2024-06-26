@@ -1,21 +1,25 @@
 import React, { useState } from "react";
-import { Button, View } from "tamagui";
+import { Button, View, Text } from "tamagui";
 import { Buffer } from "buffer";
 import {
-  Address,
   Hash,
+  Hex,
+  concat,
   createPublicClient,
   encodeAbiParameters,
   encodeFunctionData,
   http,
   parseAbi,
   toHex,
+  sha256,
 } from "viem";
 import { optimismSepolia } from "viem/chains";
 import { AsnParser } from "@peculiar/asn1-schema";
 import { ECDSASigValue } from "@peculiar/asn1-ecc";
 import { decode, encode } from "cbor-x";
 import { parseAuthenticatorData } from "@simplewebauthn/server/script/helpers";
+import { ERC6492_DETECTION_SUFFIX, FACTORY_ADDRESS } from "./data";
+import { CoinbaseSmartWalletFactoryAbi } from "../abi/CoinbaseSmartWalletFactory";
 
 /// @dev VIEM setup
 const publicClient = createPublicClient({
@@ -63,17 +67,27 @@ export default function passkey() {
       if (!credential) return;
       setCreateCredential(credential as PublicKeyCredential);
       console.log("1. createCredential", credential);
+      // CBOR-x decode attestationObject
       const attestationObject = decode(
         new Uint8Array(credential.response.attestationObject)
       );
       console.log("1.1 attestationObject", attestationObject);
+
+      // utf-8 decode clientDataJSON to text
       const decoder = new TextDecoder();
       const clientDataJSON = decoder.decode(credential.response.clientDataJSON);
       console.log("1.2 clientDataJSON", clientDataJSON);
+
+      // decode authData with parseAuthenticatorData helper
       const authData = parseAuthenticatorData(attestationObject.authData);
       console.log("1.3 authData", authData);
+
+      // CBOR-x decode credentialPublicKey
       const publicKey = decode(authData.credentialPublicKey);
       console.log("1.4 publicKey", publicKey);
+
+      /// @dev Set x, y in browser context
+      /// To get values user localStorage.getItem("x")
       localStorage.setItem("x", toHex(publicKey[-2]));
       localStorage.setItem("y", toHex(publicKey[-3]));
     });
@@ -91,9 +105,7 @@ export default function passkey() {
   }
 
   // 3. ETHEREUM on-chain verify results from authenticator
-  function verify(response: AuthenticatorAssertionResponse) {
-    // @ts-ignore
-    global.response = response; // TODO: remove after you're done
+  async function verify(response: AuthenticatorAssertionResponse) {
     const decoder = new TextDecoder("utf-8");
     console.log("3. Response", response);
     console.log(
@@ -153,12 +165,42 @@ export default function passkey() {
     );
 
     // const publicKey = createCredential.getPublicKey();
-    const accountOwners = [] as Address[];
+    const x = localStorage.getItem("x");
+    const y = localStorage.getItem("y");
+    const accountOwners = `0x${x?.slice(2)}${y?.slice(2)}` as Hex;
     const createAccountInitData = encodeFunctionData({
       abi: parseAbi(["function createAccount(bytes[] owners, uint256 nonce)"]),
       functionName: "createAccount",
-      args: [accountOwners, BigInt(0)],
+      args: [[accountOwners], BigInt(0)],
     });
+    const undeployedSmartAccountAddress = await publicClient.readContract({
+      address: FACTORY_ADDRESS,
+      abi: CoinbaseSmartWalletFactoryAbi,
+      functionName: "getAddress",
+      args: [[accountOwners], BigInt(0)],
+    });
+    const sigFor6492Account = concat([
+      encodeAbiParameters(
+        [
+          { name: "smartAccountFactory", type: "address" },
+          { name: "createAccountInitData", type: "bytes" },
+          { name: "encodedSigWrapper", type: "bytes" },
+        ],
+        [FACTORY_ADDRESS, createAccountInitData, encodedSignatureWrapper]
+      ),
+      ERC6492_DETECTION_SUFFIX,
+    ]);
+    const challenge = concat([
+      new Uint8Array(response.authenticatorData),
+      sha256(Buffer.from(decoder.decode(response.clientDataJSON))),
+    ]);
+    const isValid = await publicClient.verifyMessage({
+      address: undeployedSmartAccountAddress as Hex,
+      message: { raw: Buffer.from("I am verifying this challenge") },
+      signature: sigFor6492Account,
+    });
+
+    console.log("7. isValid", isValid);
   }
 
   return (
@@ -172,17 +214,24 @@ export default function passkey() {
         height: "100%",
       }}>
       <View style={{ display: "flex", gap: "16px" }}>
-        <Button
-          onPress={() => handleCreateCredential(createOptions)}
-          theme="active">
-          Create Passkey
-        </Button>
-
-        <Button
-          onPress={() => handleSignForCredential(getOptions)}
-          theme="active">
-          Sign with Passkey
-        </Button>
+        {!localStorage.getItem("x") && (
+          <Button
+            onPress={() => handleCreateCredential(createOptions)}
+            theme="active">
+            Create Passkey
+          </Button>
+        )}
+        {localStorage.getItem("x") && (
+          <>
+            <Text>x: {localStorage.getItem("x")}</Text>
+            <Text>y: {localStorage.getItem("y")}</Text>
+            <Button
+              onPress={() => handleSignForCredential(getOptions)}
+              theme="active">
+              Sign with Passkey
+            </Button>
+          </>
+        )}
       </View>
     </View>
   );
