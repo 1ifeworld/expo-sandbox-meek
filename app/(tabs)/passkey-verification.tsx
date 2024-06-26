@@ -132,6 +132,8 @@ export default function passkey() {
       r: BigInt(toHex(rBytes)),
       s: BigInt(toHex(sBytes)),
     };
+    console.log("6.1 r", toHex(rBytes));
+    console.log("6.1 s", toHex(sBytes));
     const webauthnStructAbi = [
       {
         components: [
@@ -199,7 +201,6 @@ export default function passkey() {
       message: { raw: Buffer.from("I am verifying this challenge") },
       signature: sigFor6492Account,
     });
-
     console.log("7. isValid", isValid);
   }
 
