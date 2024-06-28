@@ -98,6 +98,8 @@ export default function passkey() {
         const { r, s } = getRS(credential);
         console.log("6.1 r", toHex(r));
         console.log("6.2 s", toHex(s));
+        console.log("6.3 x", localStorage.getItem("x"));
+        console.log("6.3 y", localStorage.getItem("y"));
 
         const encodedSignatureWrapper = abiEncodeSignatureWrapper(
           toHex(authenticatorData),
