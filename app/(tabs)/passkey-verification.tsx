@@ -104,14 +104,14 @@ export default function passkey() {
       .then(({ _replaySafeHash, _undeployedSmartAccountAddress }) => {
         const { authenticatorData, clientDataJSON, messageHash } = getWebAuthnStruct(_replaySafeHash);
         // GET credential options
-        const getChallenge: BufferSource = hexToBytes(messageHash, { size: 32 });
+        const getChallenge: BufferSource = Buffer.from(messageHash);
         const getOptions: PublicKeyCredentialRequestOptions = {
           challenge: getChallenge,
         };
         navigator.credentials
           .get({ publicKey: getOptions })
           // @ts-ignore for some reason ts doesn't recognize correct return type
-          .then((credential: (PublicKeyCredential & { response: AuthenticatorAssertionResponse }) | null) => {
+          .then(async (credential: (PublicKeyCredential & { response: AuthenticatorAssertionResponse }) | null) => {
             if (!credential) return;
             console.log("1.2 messageHash", messageHash);
             console.log("2. Response", credential);
@@ -151,6 +151,7 @@ export default function passkey() {
               _signature: erc6492Signature,
             };
           })
+          // @ts-ignore Property '_address' does not exist on type '{ _address: `0x${string}`; _message: string; _hash: `0x${string}`; _signature: `0x${string}`; } | undefined'.
           .then(async ({ _address, _message, _hash, _signature }) => {
             const isValid = await publicClient.verifyMessage({
               address: _address,
