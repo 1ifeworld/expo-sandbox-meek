@@ -171,8 +171,6 @@ export default function passkey() {
         )}
         {localStorage.getItem("x") && (
           <>
-            <Text>x: {localStorage.getItem("x")}</Text>
-            <Text>y: {localStorage.getItem("y")}</Text>
             <Button onPress={() => handleSignWithCredential()} theme="active">
               Sign with Passkey
             </Button>
