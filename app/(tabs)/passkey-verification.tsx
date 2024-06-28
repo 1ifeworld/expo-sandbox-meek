@@ -1,33 +1,26 @@
 import React, { useState } from "react";
 import { Button, View, Text } from "tamagui";
 import { Buffer } from "buffer";
-import {
-  Hash,
-  Hex,
-  concat,
-  createPublicClient,
-  encodeAbiParameters,
-  encodeFunctionData,
-  http,
-  parseAbi,
-  toHex,
-  sha256,
-} from "viem";
+import { concat, createPublicClient, encodeAbiParameters, http, toHex, sha256, createWalletClient, Hex } from "viem";
 import { optimismSepolia } from "viem/chains";
-import { AsnParser } from "@peculiar/asn1-schema";
-import { ECDSASigValue } from "@peculiar/asn1-ecc";
-import { decode, encode } from "cbor-x";
+import { decode } from "cbor-x";
 import { parseAuthenticatorData } from "@simplewebauthn/server/script/helpers";
-import { ERC6492_DETECTION_SUFFIX, FACTORY_ADDRESS } from "./data";
+import { ERC6492_DETECTION_SUFFIX, FACTORY_ADDRESS, MOCK_VERIFIER_ADDRESS } from "./data";
 import { CoinbaseSmartWalletFactoryAbi } from "../abi/CoinbaseSmartWalletFactory";
+import { getWebAuthnStruct } from "./utils/getWebAuthnStruct";
+import { getCreateAccountInitData } from "./utils/getCreateAccountInitData";
+import { getLocalStoragePublicKey } from "./utils/getLocalStoragePublicKey";
+import { getRS } from "./utils/getRS";
+import { abiEncodeSignatureWrapper } from "./utils/abiEncodeSignatureWrapper";
+import { Mock6492VerifierAbi } from "../abi/Mock6492Verifier";
 
-/// @dev VIEM setup
+/// VIEM setup
 const publicClient = createPublicClient({
   chain: optimismSepolia,
   transport: http(),
 });
 
-/// @dev CREATE options
+/// CREATE options
 const createChallenge: BufferSource = Buffer.from("welcome to river");
 const createRp: PublicKeyCredentialRpEntity = {
   name: "River",
@@ -47,161 +40,115 @@ const createOptions: PublicKeyCredentialCreationOptions = {
   pubKeyCredParams: createPubKeyCredParams,
 };
 
-/// @dev GET options
-const getChallenge: BufferSource = Buffer.from("I am verifying this challenge");
-const getOptions: PublicKeyCredentialRequestOptions = {
-  challenge: getChallenge,
-};
-
 export default function passkey() {
-  const [createCredential, setCreateCredential] =
-    useState<PublicKeyCredential>();
+  const [createCredential, setCreateCredential] = useState<PublicKeyCredential>();
 
-  const [getCredential, setGetCredential] = useState<PublicKeyCredential>();
+  /// 1. RELYING PARTY CREATE credentials
+  function handleCreateCredential(publicKey: PublicKeyCredentialCreationOptions) {
+    navigator.credentials
+      .create({ publicKey })
+      // @ts-ignore
+      .then((credential: (PublicKeyCredential & { response: AuthenticatorAttestationResponse }) | null) => {
+        setCreateCredential(credential as PublicKeyCredential);
+        // @ts-ignore
+        const attestationObject = decode(new Uint8Array(credential.response.attestationObject));
+        const decoder = new TextDecoder();
+        // @ts-ignore
+        const clientDataJSON = decoder.decode(credential.response.clientDataJSON);
+        const authData = parseAuthenticatorData(attestationObject.authData);
+        // @ts-ignore
+        const publicKey = decode(authData.credentialPublicKey);
 
-  // 1. RELYING PARTY creating credentials
-  function handleCreateCredential(
-    publicKey: PublicKeyCredentialCreationOptions
-  ) {
-    navigator.credentials.create({ publicKey }).then((credential) => {
-      if (!credential) return;
-      setCreateCredential(credential as PublicKeyCredential);
-      console.log("1. createCredential", credential);
-      // CBOR-x decode attestationObject
-      const attestationObject = decode(
-        new Uint8Array(credential.response.attestationObject)
-      );
-      console.log("1.1 attestationObject", attestationObject);
+        console.log("1. createCredential", credential);
+        console.log("1.1 attestationObject", attestationObject);
+        console.log("1.2 clientDataJSON", clientDataJSON);
+        console.log("1.3 authData", authData);
+        console.log("1.4 publicKey", publicKey);
 
-      // utf-8 decode clientDataJSON to text
-      const decoder = new TextDecoder();
-      const clientDataJSON = decoder.decode(credential.response.clientDataJSON);
-      console.log("1.2 clientDataJSON", clientDataJSON);
-
-      // decode authData with parseAuthenticatorData helper
-      const authData = parseAuthenticatorData(attestationObject.authData);
-      console.log("1.3 authData", authData);
-
-      // CBOR-x decode credentialPublicKey
-      const publicKey = decode(authData.credentialPublicKey);
-      console.log("1.4 publicKey", publicKey);
-
-      /// @dev Set x, y in browser context
-      /// To get values user localStorage.getItem("x")
-      localStorage.setItem("x", toHex(publicKey[-2]));
-      localStorage.setItem("y", toHex(publicKey[-3]));
-    });
+        /// @dev Save public key to local storage
+        /// To get values -> localStorage.getItem("x")
+        localStorage.setItem("x", toHex(publicKey[-2]));
+        localStorage.setItem("y", toHex(publicKey[-3]));
+      });
   }
 
-  // 2. RELYING PARTY requesting credentials to sign signature
-  function handleSignForCredential(
-    publicKey: PublicKeyCredentialRequestOptions
-  ) {
-    navigator.credentials.get({ publicKey }).then((credential) => {
-      console.log("2. getCredential", credential);
-      setGetCredential(credential as PublicKeyCredential);
-      verify(credential.response);
-    });
-  }
+  /// 2. RELYING PARTY GET credentials + sign
+  async function handleSignWithCredential() {
+    // Raw message
+    const challengeHash = sha256(Buffer.from("I am verifying this challenge"));
+    const { authenticatorData, clientDataJSON, messageHash } = getWebAuthnStruct(challengeHash);
 
-  // 3. ETHEREUM on-chain verify results from authenticator
-  async function verify(response: AuthenticatorAssertionResponse) {
-    const decoder = new TextDecoder("utf-8");
-    console.log("3. Response", response);
-    console.log(
-      "4. autenticatorData",
-      toHex(new Uint8Array(response.authenticatorData))
-    );
-    console.log("5. clientDataJSON", decoder.decode(response.clientDataJSON));
-    console.log("6. signature", toHex(new Uint8Array(response.signature)));
-
-    const parsedSignature = AsnParser.parse(response.signature, ECDSASigValue);
-    let rBytes = new Uint8Array(parsedSignature.r);
-    let sBytes = new Uint8Array(parsedSignature.s);
-    function shouldRemoveLeadingZero(bytes: Uint8Array): boolean {
-      return bytes[0] === 0x0 && (bytes[1] & (1 << 7)) !== 0;
-    }
-    if (shouldRemoveLeadingZero(rBytes)) rBytes = rBytes.slice(1);
-    if (shouldRemoveLeadingZero(sBytes)) sBytes = sBytes.slice(1);
-
-    const webAuthnStruct = {
-      authenticatorData: toHex(new Uint8Array(response.authenticatorData)),
-      clientDataJson: decoder.decode(response.clientDataJSON),
-      challengeIndex: BigInt(23),
-      typeIndex: BigInt(1),
-      r: BigInt(toHex(rBytes)),
-      s: BigInt(toHex(sBytes)),
+    // GET credential options
+    const getChallenge: BufferSource = Buffer.from(messageHash);
+    const getOptions: PublicKeyCredentialRequestOptions = {
+      challenge: getChallenge,
     };
-    console.log("6.1 r", toHex(rBytes));
-    console.log("6.1 s", toHex(sBytes));
-    const webauthnStructAbi = [
-      {
-        components: [
-          { name: "authenticatorData", type: "bytes" },
-          { name: "clientDataJson", type: "string" },
-          { name: "challengeIndex", type: "uint256" },
-          { name: "typeIndex", type: "uint256" },
-          { name: "r", type: "uint256" },
-          { name: "s", type: "uint256" },
-        ],
-        name: "WebAuthnAuth",
-        type: "tuple",
-      },
-    ] as const;
-    const encodedWebAuthnStruct = encodeAbiParameters(webauthnStructAbi, [
-      webAuthnStruct,
-    ]);
-    const coinbaseSignatureWrapperAbi = [
-      {
-        components: [
-          { name: "ownerIndex", type: "uint256" },
-          { name: "signatureData", type: "bytes" },
-        ],
-        name: "SignatureWrapper",
-        type: "tuple",
-      },
-    ] as const;
-    const encodedSignatureWrapper: Hash = encodeAbiParameters(
-      coinbaseSignatureWrapperAbi,
-      [{ ownerIndex: BigInt(0), signatureData: encodedWebAuthnStruct }]
-    );
+    navigator.credentials
+      .get({ publicKey: getOptions })
+      // @ts-ignore for some reason ts doesn't recognize correct return type
+      .then((credential: (PublicKeyCredential & { response: AuthenticatorAssertionResponse }) | null) => {
+        if (!credential) return;
+        console.log("1. messageHash", messageHash);
+        console.log("2. Response", credential);
+        console.log("3. authenticatorData", toHex(new Uint8Array(credential.response.authenticatorData)));
+        const decoder = new TextDecoder("utf-8");
+        console.log("4. clientDataJSON", decoder.decode(credential.response.clientDataJSON));
+        console.log("5. signature", toHex(new Uint8Array(credential.response.signature)));
 
-    // const publicKey = createCredential.getPublicKey();
-    const x = localStorage.getItem("x");
-    const y = localStorage.getItem("y");
-    const accountOwners = `0x${x?.slice(2)}${y?.slice(2)}` as Hex;
-    const createAccountInitData = encodeFunctionData({
-      abi: parseAbi(["function createAccount(bytes[] owners, uint256 nonce)"]),
-      functionName: "createAccount",
-      args: [[accountOwners], BigInt(0)],
-    });
-    const undeployedSmartAccountAddress = await publicClient.readContract({
-      address: FACTORY_ADDRESS,
-      abi: CoinbaseSmartWalletFactoryAbi,
-      functionName: "getAddress",
-      args: [[accountOwners], BigInt(0)],
-    });
-    const sigFor6492Account = concat([
-      encodeAbiParameters(
-        [
-          { name: "smartAccountFactory", type: "address" },
-          { name: "createAccountInitData", type: "bytes" },
-          { name: "encodedSigWrapper", type: "bytes" },
-        ],
-        [FACTORY_ADDRESS, createAccountInitData, encodedSignatureWrapper]
-      ),
-      ERC6492_DETECTION_SUFFIX,
-    ]);
-    const challenge = concat([
-      new Uint8Array(response.authenticatorData),
-      sha256(Buffer.from(decoder.decode(response.clientDataJSON))),
-    ]);
-    const isValid = await publicClient.verifyMessage({
-      address: undeployedSmartAccountAddress as Hex,
-      message: { raw: Buffer.from("I am verifying this challenge") },
-      signature: sigFor6492Account,
-    });
-    console.log("7. isValid", isValid);
+        const { r, s } = getRS(credential);
+        console.log("6.1 r", toHex(r));
+        console.log("6.2 s", toHex(s));
+
+        const encodedSignatureWrapper = abiEncodeSignatureWrapper(
+          toHex(authenticatorData),
+          clientDataJSON,
+          toHex(r),
+          toHex(s)
+        );
+
+        const sig = concat([
+          encodeAbiParameters(
+            [
+              { name: "smartAccountFactory", type: "address" },
+              { name: "createAccountInitData", type: "bytes" },
+              { name: "encodedSigWrapper", type: "bytes" },
+            ],
+            [FACTORY_ADDRESS, getCreateAccountInitData([getLocalStoragePublicKey()]), encodedSignatureWrapper]
+          ),
+          ERC6492_DETECTION_SUFFIX,
+        ]);
+        return {
+          _signature: sig,
+        };
+      })
+      // @ts-ignore Property '_signature' does not exist on type '{ _signature: `0x${string}`; } | undefined'
+      .then(async ({ _signature }) => {
+        const undeployedSmartAccountAddress = await publicClient.readContract({
+          address: FACTORY_ADDRESS,
+          abi: CoinbaseSmartWalletFactoryAbi,
+          functionName: "getAddress",
+          args: [[getLocalStoragePublicKey()], BigInt(0)],
+        });
+        return {
+          _signer: undeployedSmartAccountAddress,
+          _hash: messageHash,
+          _signature: _signature,
+        };
+      })
+      .then(async ({ _signer, _hash, _signature }) => {
+        const { request } = await publicClient.simulateContract({
+          address: MOCK_VERIFIER_ADDRESS,
+          abi: Mock6492VerifierAbi,
+          functionName: "isValidSig",
+          // @ts-ignore Type 'unknown' is not assignable to type '`0x${string}`' for signer
+          args: [_signer, _hash, _signature],
+        });
+
+        console.log("7. request", request);
+      })
+      .catch((err) => {
+        console.error(err);
+      });
   }
 
   return (
@@ -216,9 +163,7 @@ export default function passkey() {
       }}>
       <View style={{ display: "flex", gap: "16px" }}>
         {!localStorage.getItem("x") && (
-          <Button
-            onPress={() => handleCreateCredential(createOptions)}
-            theme="active">
+          <Button onPress={() => handleCreateCredential(createOptions)} theme="active">
             Create Passkey
           </Button>
         )}
@@ -226,9 +171,7 @@ export default function passkey() {
           <>
             <Text>x: {localStorage.getItem("x")}</Text>
             <Text>y: {localStorage.getItem("y")}</Text>
-            <Button
-              onPress={() => handleSignForCredential(getOptions)}
-              theme="active">
+            <Button onPress={() => handleSignWithCredential()} theme="active">
               Sign with Passkey
             </Button>
           </>
