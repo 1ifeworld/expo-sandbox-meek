@@ -141,6 +141,15 @@ export default function passkey() {
             console.log("6.2 s", toHex(s));
             console.log("6.3 x", localStorage.getItem("x"));
             console.log("6.3 y", localStorage.getItem("y"));
+            // TODO: VERIFY P256 Singature here first before proceeding
+
+            // const isValid =
+            //   secp256r1.verify(
+            //     new Uint8Array(credential.response.signature),
+            //     hexToBytes(_replaySafeHash),
+            //     hexToBytes(getLocalStoragePublicKey())
+            //   ) === true;
+            // console.log("6.4 isValid", isValid);
 
             const encodedSignatureWrapper = abiEncodeSignatureWrapper(
               toHex(authenticatorData),
