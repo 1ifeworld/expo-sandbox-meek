@@ -1,19 +1,29 @@
 import React, { useState } from "react";
 import { Button, View, Text } from "tamagui";
 import { Buffer } from "buffer";
-import { concat, createPublicClient, encodeAbiParameters, http, toHex, hashMessage, Address, hexToBytes } from "viem";
+import {
+  concat,
+  createPublicClient,
+  encodeAbiParameters,
+  http,
+  toHex,
+  hashMessage,
+  Address,
+  stringToBytes,
+  keccak256,
+} from "viem";
 import { optimismSepolia } from "viem/chains";
 import { decode } from "cbor-x";
 import { parseAuthenticatorData } from "@simplewebauthn/server/script/helpers";
 import { ERC6492_DETECTION_SUFFIX, FACTORY_ADDRESS } from "./data";
 import { CoinbaseSmartWalletFactoryAbi } from "../abi/CoinbaseSmartWalletFactory";
-import { getWebAuthnStruct } from "./utils/getWebAuthnStruct";
 import { getCreateAccountInitData } from "./utils/getCreateAccountInitData";
 import { getLocalStoragePublicKey } from "./utils/getLocalStoragePublicKey";
 import { getRS } from "./utils/getRS";
 import { abiEncodeSignatureWrapper } from "./utils/abiEncodeSignatureWrapper";
 import { isErc6492Signature } from "viem/experimental";
 import { CoinbaseSmartWallet } from "../abi/CoinbaseSmartWallet";
+import { secp256r1 } from "@noble/curves/p256";
 
 /// VIEM setup
 const publicClient = createPublicClient({
@@ -103,7 +113,6 @@ export default function passkey() {
         };
       })
       .then(({ _replaySafeHash, _undeployedSmartAccountAddress }) => {
-        const { authenticatorData, clientDataJSON, messageHash } = getWebAuthnStruct(_replaySafeHash);
         // GET credential options
         const getChallenge: BufferSource = Buffer.from(_replaySafeHash);
         const getOptions: PublicKeyCredentialRequestOptions = {
@@ -114,9 +123,6 @@ export default function passkey() {
           // @ts-ignore for some reason ts doesn't recognize correct return type
           .then(async (credential: (PublicKeyCredential & { response: AuthenticatorAssertionResponse }) | null) => {
             if (!credential) return;
-            console.log("1.2 messageHash", messageHash);
-            console.log("2. Response", credential);
-            console.log("3. authenticatorData", toHex(new Uint8Array(credential.response.authenticatorData)));
             const decoder = new TextDecoder("utf-8");
             const clientDataJSON = decoder.decode(credential.response.clientDataJSON);
             const clientDataJSONHash = keccak256(stringToBytes(clientDataJSON));
