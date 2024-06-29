@@ -76,8 +76,10 @@ export default function passkey() {
   /// 2. RELYING PARTY GET credentials + sign
   async function handleSignWithCredential() {
     // Raw message
-    const message = "I am verifying this challenge";
-    const challengeHash = hashMessage(message);
+    const message = "I am verifying this message";
+    const hashedMessage = hashMessage(message);
+    console.log("1.0 message", message);
+    console.log("1.1 hashMessage(message)", hashedMessage);
 
     await publicClient
       .readContract({
@@ -93,9 +95,8 @@ export default function passkey() {
           abi: CoinbaseSmartWallet,
           address: _undeployedSmartAccountAddress as Address,
           functionName: "replaySafeHash",
-          args: [challengeHash],
+          args: [hashedMessage],
         });
-        console.log("1.1 replaySafeHash", replaySafeHash);
         return {
           _replaySafeHash: replaySafeHash,
           _undeployedSmartAccountAddress: _undeployedSmartAccountAddress,
