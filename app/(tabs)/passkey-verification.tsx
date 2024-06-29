@@ -153,23 +153,23 @@ export default function passkey() {
               ),
               ERC6492_DETECTION_SUFFIX,
             ]);
-            console.log("7.1 isErc6492Signature", isErc6492Signature(erc6492Signature));
+            console.log("7.0 isErc6492Signature", isErc6492Signature(erc6492Signature));
+
             return {
               _address: _undeployedSmartAccountAddress as Address,
               _message: message,
-              _hash: _replaySafeHash,
+              _replaySafeHash: _replaySafeHash,
               _signature: erc6492Signature,
             };
           })
-          // @ts-ignore Property '_address' does not exist on type '{ _address: `0x${string}`; _message: string; _hash: `0x${string}`; _signature: `0x${string}`; } | undefined'.
-          .then(async ({ _address, _message, _hash, _signature }) => {
+          .then(async ({ _address, _message, _replaySafeHash, _signature }) => {
             const isValid = await publicClient.verifyMessage({
               address: _address,
-              message: _message,
+              message: _replaySafeHash,
               signature: _signature,
             });
 
-            console.log("7. isValid", isValid);
+            console.log("7.1 isValid", isValid);
           })
           .catch((err) => {
             console.error(err);
