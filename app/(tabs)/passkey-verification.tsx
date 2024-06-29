@@ -105,7 +105,7 @@ export default function passkey() {
       .then(({ _replaySafeHash, _undeployedSmartAccountAddress }) => {
         const { authenticatorData, clientDataJSON, messageHash } = getWebAuthnStruct(_replaySafeHash);
         // GET credential options
-        const getChallenge: BufferSource = Buffer.from(messageHash);
+        const getChallenge: BufferSource = Buffer.from(_replaySafeHash);
         const getOptions: PublicKeyCredentialRequestOptions = {
           challenge: getChallenge,
         };
@@ -118,7 +118,16 @@ export default function passkey() {
             console.log("2. Response", credential);
             console.log("3. authenticatorData", toHex(new Uint8Array(credential.response.authenticatorData)));
             const decoder = new TextDecoder("utf-8");
-            console.log("4. clientDataJSON", decoder.decode(credential.response.clientDataJSON));
+            const clientDataJSON = decoder.decode(credential.response.clientDataJSON);
+            const clientDataJSONHash = keccak256(stringToBytes(clientDataJSON));
+            const authenticatorData = toHex(new Uint8Array(credential.response.authenticatorData));
+            const messageHash = keccak256(concat([authenticatorData, clientDataJSONHash]));
+
+            console.log("1.2 replaySafeHash", _replaySafeHash);
+            console.log("1.3 messageHash", messageHash);
+            console.log("2. response", credential.response);
+            console.log("3. authenticatorData", authenticatorData);
+            console.log("4. clientDataJSON", clientDataJSON);
             console.log("5. signature", toHex(new Uint8Array(credential.response.signature)));
 
             const { r, s } = getRS(credential);
